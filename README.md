@@ -3,14 +3,7 @@
 # Installation and compilation 
 ```
 git clone https://github.com/nataraj2/MultiphaseSolverAMReX.git
-cd MultiphaseSolverAMReX
-cd interfacereconstructionlibrary
-mkdir build
-cd build
-cmake -D EIGEN_INCLUDE_DIR=../eigen -D CMAKE_INSTALL_PREFIX=../install ..
-make
-make install
-cd ../../amrex
+sh install.sh
 vi Tools/GNUMake/Make.local
 ```
 In Make.local, change the path to IRLDIR, and the compilers CXX, CC, FC, F90. 
