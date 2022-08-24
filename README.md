@@ -13,13 +13,24 @@
 9. cd ../../amrex
 10. vi Tools/GNUMake/Make.local
 ```
-In Make.local, change the path to IRLDIR, and the compilers CXX, CC, FC, F90
+In Make.local, change the path to IRLDIR, and the compilers CXX, CC, FC, F90. 
+Make sure to use mpi compilers.
 
-# How to run?
+# Running
 ```
-cd Tutorials/Amr/MultiphaseSolver_Zalesak_Elvira/Exec/Zalesak_Elvira
-make -j
-sh run_3d.sh
+1. cd Tutorials/Amr/MultiphaseSolver_Zalesak_Elvira/Exec/Zalesak_Elvira
+2. make -j
+3. sh run_3d.sh
 ```
+
+#Visualization
+VisIt 2.13 is the minimum version needed for visualization. The AMReX files cannot 
+be read by the earlier versions of VisIt.
+```
+run_output.sh
+```
+will create a text file movie.visit (which contains a list of headers of the files which has all 
+the flow variables), and a file plic.visit in the directory ensight-3D, in which all plic data is 
+written. Both these files can be loaded into VisIt and visualized.
 
 
