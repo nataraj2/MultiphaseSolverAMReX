@@ -29,8 +29,9 @@ be read by the earlier versions of VisIt. In the running directory, do
 ```
 sh run_output.sh
 ```
-will create a text file movie.visit (which contains a list of headers of the files which has all 
-the flow variables), and a file plic.visit in the directory ensight-3D, in which all plic data is 
-written. Both these files can be loaded into VisIt and visualized.
+will create a text file `movie.visit` (which contains a list of headers of the files which has all 
+the flow variables). It will create a directory ensight-3D, in which all plic data is 
+written. A file plic.visit is also written out. Both movie.visit and plic.visit can be loaded 
+simultaneously into VisIt and visualized.
 
 
