@@ -1,0 +1,593 @@
+OldTutorials/MultiColor_C/main.cpp:    // these multifabs go to task 0 only
+OldTutorials/MultiColor_C/main.cpp:    // register how to copy multifabs to/from tasks
+OldTutorials/MultiColor_C/main.cpp:    // can reuse ForkJoin object for multiple fork-join invocations
+OldTutorials/MultiColor_C/main.cpp:    // creates forked multifabs only first time around, reuses them thereafter
+OldTutorials/PIC_C/single_level.cpp:    // build a multifab for the rhs on the box array with 
+OldTutorials/PIC_C/single_level.cpp:    //    we want to use the multilevel interface in the different calls.
+OldTutorials/PIC_C/single_level.cpp:    // Use multigrid to solve Lap(phi) = rhs with periodic boundary conditions (set above)
+OldTutorials/PIC_C/two_level.cpp:    // build a multifab for the rhs on the box array with 
+OldTutorials/PIC_C/two_level.cpp:    // 2) Do a multi-level solve on levels 0 and 1.
+OldTutorials/PIC_C/two_level.cpp:    // Use multigrid to solve Lap(phi) = rhs with periodic boundary conditions (set above)
+OldTutorials/PIC_C/two_level.cpp:    // Use multigrid to solve Lap(phi) = rhs with boundary conditions from level 0
+OldTutorials/PIC_C/two_level.cpp:    // 2) Do a multi-level solve on levels 0 and 1.
+OldTutorials/PIC_C/two_level.cpp:    // Define this to be solve at multi-level solve
+OldTutorials/PIC_C/two_level.cpp:    // Use multigrid to solve Lap(phi) = rhs with periodic boundary conditions (set above)
+OldTutorials/PIC_C/two_level.cpp:    MyPC->WriteAsciiFile("Particles_after_multilevel_solve");
+OldTutorials/DataServicesTest0/DataServicesTest0.cpp:      std::cout << "filling multifab for " << plotVarNames[0] << std::endl;
+OldTutorials/Tiling_C/main.cpp:    // build a multifab on the box array with 1 component, 0 ghost cells
+OldTutorials/TwoGrid_PIC_C/main.cpp:    // build a multifab for the rhs on the box array with 
+OldTutorials/TwoGrid_PIC_C/main.cpp:    // 2) Do a multi-level solve on levels 0 and 1.
+OldTutorials/TwoGrid_PIC_C/main.cpp:    // Use multigrid to solve Lap(phi) = rhs with periodic boundary conditions (set above)
+OldTutorials/TwoGrid_PIC_C/main.cpp:    // Use multigrid to solve Lap(phi) = rhs with boundary conditions from level 0
+OldTutorials/TwoGrid_PIC_C/main.cpp:    // 2) Do a multi-level solve on levels 0 and 1.
+OldTutorials/TwoGrid_PIC_C/main.cpp:    // Define this to be solve at multi-level solve
+OldTutorials/TwoGrid_PIC_C/main.cpp:    // Use multigrid to solve Lap(phi) = rhs with periodic boundary conditions (set above)
+OldTutorials/TwoGrid_PIC_C/main.cpp:    MyPC->WriteAsciiFile("Particles_after_multilevel_solve");
+OldTutorials/MultiFabTests_C/MultiFabReadWrite.cpp://  this file writes and reads multifabs.
+OldTutorials/MultiFabTests_C/MultiFabReadWrite.cpp:    // ---- make a multifab, set interior to the index
+OldTutorials/MultiFabTests_C/MultiFabReadWrite.cpp:    VisMF::Write(mf, outfile);  // ---- write the multifab to MF_Out
+OldTutorials/MultiFabTests_C/MultiFabReadWrite.cpp:    // ---- make a new multifab and read in the one we just wrote
+OldTutorials/MultiFabTests_C/MultiFabReadWrite.cpp:    // ---- make a new multifab with the new map and copy from mf
+OldTutorials/MultiFabTests_C/MultiFabReadWrite.cpp:    // ---- all three multifabs should be the same
+OldTutorials/MultiFabTests_C/MultiFabFillBoundary.cpp://  this file writes and reads multifabs.
+OldTutorials/MultiFabTests_C/MultiFabFillBoundary.cpp:    // ---- make a multifab, set interior to the index
+OldTutorials/MultiFabTests_C/MultiFabFillBoundary.cpp:    VisMF::Write(mf, outfile);  // ---- write the multifab to MF_Out
+OldTutorials/MultiFabTests_C/MultiFabFillBoundary.cpp:    // ---- make a new multifab with the new map and copy from mf
+Src/Amr/AMReX_StateData.cpp:StateData::RegisterData (MultiFabCopyDescriptor& multiFabCopyDesc,
+Src/Amr/AMReX_StateData.cpp:    mfid[MFNEWDATA] = multiFabCopyDesc.RegisterFabArray(new_data.get());
+Src/Amr/AMReX_StateData.cpp:    mfid[MFOLDDATA] = multiFabCopyDesc.RegisterFabArray(old_data.get());
+Src/Amr/AMReX_StateData.cpp:StateData::InterpAddBox (MultiFabCopyDescriptor& multiFabCopyDesc,
+Src/Amr/AMReX_StateData.cpp:            returnedFillBoxIds[0] = multiFabCopyDesc.AddBox(mfid[MFNEWDATA],
+Src/Amr/AMReX_StateData.cpp:            amrex::InterpAddBox(multiFabCopyDesc,
+Src/Amr/AMReX_StateData.cpp:            returnedFillBoxIds[0] = multiFabCopyDesc.AddBox(mfid[MFNEWDATA],
+Src/Amr/AMReX_StateData.cpp:            returnedFillBoxIds[0] = multiFabCopyDesc.AddBox(mfid[MFOLDDATA],
+Src/Amr/AMReX_StateData.cpp:StateData::InterpFillFab (MultiFabCopyDescriptor&  multiFabCopyDesc,
+Src/Amr/AMReX_StateData.cpp:            multiFabCopyDesc.FillFab(mfid[MFNEWDATA], fillBoxIds[0], dest);
+Src/Amr/AMReX_StateData.cpp:            amrex::InterpFillFab(multiFabCopyDesc,
+Src/Amr/AMReX_StateData.cpp:            multiFabCopyDesc.FillFab(mfid[MFNEWDATA], fillBoxIds[0], dest);
+Src/Amr/AMReX_StateData.cpp:            multiFabCopyDesc.FillFab(mfid[MFOLDDATA], fillBoxIds[0], dest);
+Src/Amr/AMReX_AmrLevel.cpp:    // We combine all of the multifabs -- state, derived, etc -- into one
+Src/Amr/AMReX_AmrLevel.cpp:    // multifab -- plotMF.
+Src/Amr/AMReX_AmrLevel.cpp:            Perilla::multifabCopyPushAsync( destGraph, srcGraph, &mf, smf[0],  f, dcomp, scomp, ncomp, mf.nGrow(), 0, singleT);
+Src/Amr/AMReX_AmrLevel.cpp:                Perilla::multifabCopyPushAsync( destGraph, srcGraph, &mf, dmf, f, dcomp, 0, ncomp, mf.nGrow(), 0, singleT);
+Src/Amr/AMReX_AmrLevel.cpp:        }else{ //fill the whole multifab
+Src/Amr/AMReX_AmrLevel.cpp:          Perilla::multifabCopyPull( destGraph, srcGraph, &mf, smf[0], f, dcomp, scomp, ncomp, mf.nGrow(), 0, singleT);
+Src/Amr/AMReX_AmrLevel.cpp:                Perilla::multifabCopyPull( destGraph, srcGraph, &mf, dummyMF, f, dcomp, 0, ncomp, mf.nGrow(), 0, singleT);
+Src/Amr/AMReX_AmrLevel.cpp:                Perilla::multifabExtractCopyAssoc( destGraph, fsrcGraph, m_fabs, *(smf[0]), (const int) ncomp, m_fabs.nGrow(), 0, geom->periodicity());
+Src/Amr/AMReX_AmrLevel.cpp:                        Perilla::multifabBuildFabCon(destGraph, m_fabs, geom->periodicity());
+Src/Amr/AMReX_AmrLevel.cpp:                    Perilla::multifabExtractCopyAssoc(destGraph, fsrcGraph, m_fabs, *dmf, ncomp, m_fabs.nGrow(), 0, geom->periodicity());
+Src/Amr/AMReX_AmrLevel.cpp:                              Perilla::multifabExtractCopyAssoc( m_rg_crse_patch, csrcGraph, *m_mf_crse_patch, *(smf_crse[0]), ncomp, m_mf_crse_patch->nGrow(), 0,geom_crse->periodicity());
+Src/Amr/AMReX_AmrLevel.cpp:                                  Perilla::multifabBuildFabCon(m_rg_crse_patch, *m_mf_crse_patch, geom->periodicity());
+Src/Amr/AMReX_AmrLevel.cpp:                                  Perilla::multifabExtractCopyAssoc( m_rg_crse_patch, csrcGraph, *m_mf_crse_patch, *dmf, ncomp, m_mf_crse_patch->nGrow(), 0, geom_crse->periodicity());
+Src/Amr/AMReX_AmrLevel.cpp:                      Perilla::multifabExtractCopyAssoc( destGraph, fsrcGraph, m_fabs, *(dmff), ncomp, m_fabs.nGrow(), 0, geom_fine->periodicity());
+Src/Amr/AMReX_AmrLevel.cpp:                          Perilla::multifabBuildFabCon(destGraph, m_fabs, geom->periodicity());
+Src/Amr/AMReX_AmrLevel.cpp:                          Perilla::multifabExtractCopyAssoc( destGraph, fsrcGraph, m_fabs, *dmff, ncomp, m_fabs.nGrow(), 0, geom_fine->periodicity());
+Src/Amr/AMReX_AsyncFillPatch.cpp:		    Perilla::multifabExtractCopyAssoc( destGraph, fsrcGraph, m_fabs, *smf[0], ncomp, m_fabs.nGrow(), 0, geom->periodicity());
+Src/Amr/AMReX_AsyncFillPatch.cpp:			Perilla::multifabBuildFabCon(destGraph, m_fabs, geom->periodicity());
+Src/Amr/AMReX_AsyncFillPatch.cpp:			Perilla::multifabExtractCopyAssoc( destGraph, fsrcGraph, m_fabs, *dmf, ncomp, m_fabs.nGrow(), 0, geom->periodicity());
+Src/Amr/AMReX_AsyncFillPatch.cpp:				Perilla::multifabExtractCopyAssoc( m_rg_crse_patch, csrcGraph, *m_mf_crse_patch, *smf_crse[0], ncomp, m_mf_crse_patch->nGrow(), 0,geom_crse->periodicity());
+Src/Amr/AMReX_AsyncFillPatch.cpp:				    Perilla::multifabBuildFabCon(m_rg_crse_patch, *m_mf_crse_patch,geom_crse->periodicity());
+Src/Amr/AMReX_AsyncFillPatch.cpp:				    Perilla::multifabExtractCopyAssoc( m_rg_crse_patch, csrcGraph, *m_mf_crse_patch, *dmf, ncomp, m_mf_crse_patch->nGrow(), 0, geom_crse->periodicity());
+Src/Amr/AMReX_AsyncFillPatch.cpp:			Perilla::multifabExtractCopyAssoc( destGraph, fsrcGraph, m_fabs, *smf_fine[0], ncomp, m_fabs.nGrow(), 0, geom_fine->periodicity());
+Src/Amr/AMReX_AsyncFillPatch.cpp:			    Perilla::multifabBuildFabCon(destGraph, m_fabs, geom_fine->periodicity());
+Src/Amr/AMReX_AsyncFillPatch.cpp:			    Perilla::multifabExtractCopyAssoc( destGraph, fsrcGraph, m_fabs, *dmff, ncomp, m_fabs.nGrow(), 0, geom_fine->periodicity());
+Src/Amr/AMReX_AsyncFillPatch.cpp:	    Perilla::multifabCopyPush(destGraph, srcGraph, &mf, smf[0],  f, dcomp, scomp, ncomp, mf.nGrow(), 0, singleT);
+Src/Amr/AMReX_AsyncFillPatch.cpp:		Perilla::multifabCopyPush( destGraph, srcGraph, &mf, dmf, f, dcomp, 0, ncomp, mf.nGrow(), 0 ,singleT);
+Src/Amr/AMReX_AsyncFillPatch.cpp:	    Perilla::multifabCopyPull( destGraph, srcGraph, &mf, smf[0], f, dcomp, scomp, ncomp, mf.nGrow(), 0, singleT);
+Src/Amr/AMReX_AsyncFillPatch.cpp:		Perilla::multifabCopyPull( destGraph, srcGraph, &mf, dummyMF, f, dcomp, 0, ncomp, mf.nGrow(), 0, singleT);
+Src/Amr/AMReX_AsyncFillPatch.cpp:	    }else{ //fill the whole multifab
+Src/Amr/AMReX_Amr.cpp:    // Check that domain size is a multiple of blocking_factor[0].
+Src/Amr/AMReX_Amr.cpp:    // Check that max_grid_size is a multiple of blocking_factor at every level.
+Src/Amr/AMReX_Amr.cpp:    // The following was added for multifluid.
+Src/LinearSolvers/C_CellMG/AMReX_MultiGrid.cpp:                           << " multigrid levels created for this solve" << '\n';
+Src/LinearSolvers/C_CellMG/AMReX_MultiGrid.cpp:    // Recursively relax system.  Equivalent to multigrid V-cycle.
+Src/LinearSolvers/C_CellMG/AMReX_CGSolver.cpp:        p.mult(aj[0],0,1);
+Src/LinearSolvers/C_CellMG/AMReX_CGSolver.cpp:        r.mult(cj[0],0,1);
+Src/LinearSolvers/C_TensorMG/AMReX_MCMultiGrid.cpp:                           << " multigrid levels created for this solve" << '\n';
+Src/LinearSolvers/C_TensorMG/AMReX_MCMultiGrid.cpp:  // Recursively relax system.  Equivalent to multigrid V-cycle.
+Src/LinearSolvers/C_TensorMG/AMReX_MCCGSolver.cpp:    // Copy initial guess into a temp multifab guaranteed to have ghost cells.
+Src/LinearSolvers/MLMG/AMReX_MLMG.cpp:// Compute multi-level Residual (res) up to amrlevmax.
+Src/LinearSolvers/MLMG/AMReX_MLMG.cpp:// Computes multi-level masked inf-norm of Residual (res).
+Src/LinearSolvers/MLMG/AMReX_MLMG.cpp:// Compute multi-level masked inf-norm of RHS (rhs).
+Src/LinearSolvers/MLMG/AMReX_MLNodeLaplacian.cpp:            // No level bc multifab
+Src/LinearSolvers/MLMG/AMReX_MLCellABecLap.cpp:                a_flux[alev][idim]->mult(betainv);
+Src/AmrTask/Amr/AMReX_AmrTask.cpp:    // Check that domain size is a multiple of blocking_factor[0].
+Src/AmrTask/Amr/AMReX_AmrTask.cpp:    // Check that max_grid_size is a multiple of blocking_factor at every level.
+Src/AmrTask/Amr/AMReX_AmrTask.cpp:    // The following was added for multifluid.
+Src/AmrTask/Amr/AMReX_AmrLevelTask.cpp:    // We combine all of the multifabs -- state, derived, etc -- into one
+Src/AmrTask/Amr/AMReX_AmrLevelTask.cpp:    // multifab -- plotMF.
+Src/AmrTask/rts_impls/runtime_common/Perilla_common.cpp:void Perilla::multifabBuildFabCon(RegionGraph* rg, const MultiFab& mf, const Periodicity& period)
+Src/AmrTask/rts_impls/runtime_common/Perilla_common.cpp:            //bool cc = !mf->is_nodal(); //  cc = multifab_cell_centered_q(mf)
+Src/AmrTask/rts_impls/runtime_common/Perilla_common.cpp:            //bool cc = !mf->is_nodal(); //  cc = multifab_cell_centered_q(mf)
+Src/AmrTask/rts_impls/runtime_common/Perilla_common.cpp:}// multifabBuildFabCon
+Src/AmrTask/rts_impls/runtime_common/Perilla_common.cpp:void Perilla::multifabExtractCopyAssoc(RegionGraph* gDst, RegionGraph* gSrc, const MultiFab& mfDst, const MultiFab& mfSrc, int nc, int ng, int ngSrc, const Periodicity& period)
+Src/AmrTask/rts_impls/runtime_common/Perilla_common.cpp:} // multifabExtractCopyAssoc
+Src/AmrTask/rts_impls/runtime_common/Perilla_common.cpp:void Perilla::multifabCopyPull(RegionGraph* destGraph, RegionGraph* srcGraph, MultiFab* mfDst, MultiFab* mfSrc, int f, int dstcomp, int srccomp, int nc, int ng, int ngsrc, bool singleT)
+Src/AmrTask/rts_impls/runtime_common/Perilla_common.cpp:    if(mfDst->nComp() < (dstcomp-1)) cout <<"MULTIFAB_COPY_C: nc too large for dst multifab"<< endl;
+Src/AmrTask/rts_impls/runtime_common/Perilla_common.cpp:    //if(mfSrc->nComp() < (srccomp-1)) cout <<"MULTIFAB_COPY_C: nc too large for src multifab"<< endl;
+Src/AmrTask/rts_impls/runtime_common/Perilla_common.cpp:} // multifabCopyPull
+Src/AmrTask/rts_impls/runtime_common/Perilla_common.cpp:void Perilla::multifabCopyPull(RegionGraph* destGraph, RegionGraph* srcGraph, amrex::MultiFab* mfDst, amrex::MultiFab* mfSrc, int f, int dstcomp, int srccomp, int nc, int ng, int ngsrc, bool singleT)
+Src/AmrTask/rts_impls/runtime_common/Perilla_common.cpp:    if(mfDst->nComp() < (dstcomp-1)) cout <<"MULTIFAB_COPY_C: nc too large for dst multifab"<< endl;
+Src/AmrTask/rts_impls/runtime_common/Perilla_common.cpp:      //multifabCopyPull_1Team(destGraph,srcGraph,mfDst,mfSrc,f,dstcomp,srccomp,nc,ng,ngsrc,singleT);
+Src/AmrTask/rts_impls/runtime_common/Perilla_common.cpp:          multifabCopyLocPull(destGraph,srcGraph,mfDst,mfSrc,f,tid,dstcomp,srccomp,nc,ng,ngsrc);
+Src/AmrTask/rts_impls/runtime_common/Perilla_common.cpp:          multifabCopyRmtPull(destGraph,srcGraph,mfDst,mfSrc,f,tid,dstcomp,srccomp,nc,ng,ngsrc);
+Src/AmrTask/rts_impls/runtime_common/Perilla_common.cpp:      multifabCopyPull_1Team(destGraph,srcGraph,mfDst,mfSrc,f,tid,dstcomp,srccomp,nc,ng,ngsrc,singleT);
+Src/AmrTask/rts_impls/runtime_common/Perilla_common.cpp:void Perilla::multifabExtractCopyAssoc(RegionGraph* gDst, RegionGraph* gSrc, const MultiFab& mfDst, const MultiFab& mfSrc, int nc, int ng, int ngSrc, const Periodicity& period)
+Src/AmrTask/rts_impls/runtime_common/Perilla_common.cpp:} // multifabExtractCopyAssoc
+Src/AmrTask/rts_impls/runtime_common/Perilla_common.cpp:void Perilla::multifabCopyPushAsync(RegionGraph* destGraph, RegionGraph* srcGraph, MultiFab* mfDst, MultiFab* mfSrc, int f, int dstcomp, int srccomp, int nc, int ng, int ngsrc, bool singleT)
+Src/AmrTask/rts_impls/runtime_common/Perilla_common.cpp:    if(mfDst->nComp() < (dstcomp-1)) cout <<"MULTIFAB_COPY_C: nc too large for dst multifab"<< endl;
+Src/AmrTask/rts_impls/runtime_common/Perilla_common.cpp:    if(mfSrc->nComp() < (srccomp-1)) cout <<"MULTIFAB_COPY_C: nc too large for src multifab"<< endl;
+Src/AmrTask/rts_impls/runtime_common/Perilla_common.cpp:} // multifabCopyPushAsync
+Src/AmrTask/rts_impls/runtime_common/Perilla_common.cpp:void Perilla::multifabCopyPull(RegionGraph* destGraph, RegionGraph* srcGraph, MultiFab* mfDst, MultiFab* mfSrc, int f, int dstcomp, int srccomp, int nc, int ng, int ngsrc, bool singleT)
+Src/AmrTask/rts_impls/runtime_common/Perilla_common.cpp:    if(mfDst->nComp() < (dstcomp-1)) cout <<"MULTIFAB_COPY_C: nc too large for dst multifab"<< endl;
+Src/AmrTask/rts_impls/runtime_common/Perilla_common.cpp:    //if(mfSrc->nComp() < (srccomp-1)) cout <<"MULTIFAB_COPY_C: nc too large for src multifab"<< endl;
+Src/AmrTask/rts_impls/runtime_common/Perilla_common.cpp:} // multifabCopyPull
+Src/AmrTask/rts_impls/runtime_common/AsyncMultiFabUtil.cpp:    Perilla::multifabCopyPushAsync(RG_crse, RG_fine, &S_crse, &crse_S_fine, f, scomp, 0, ncomp, 0, 0, false);
+Src/AmrTask/rts_impls/runtime_common/AsyncMultiFabUtil.cpp:    Perilla::multifabCopyPull(RG_crse, RG_fine, &S_crse, &S_fine, f, scomp, 0, ncomp, 0, 0, false);
+Src/AmrTask/rts_impls/runtime_common/AsyncMultiFabUtil.cpp:    Perilla::multifabCopyPushAsync(RG_crse, RG_fine, &S_crse, &crse_S_fine, f, scomp, 0, ncomp, 0, 0, false);
+Src/AmrTask/rts_impls/runtime_common/AsyncMultiFabUtil.cpp:    Perilla::multifabCopyPull(RG_crse, RG_fine, &S_crse, &S_fine, f, scomp, 0, ncomp, 0, 0, false);
+Src/AmrTask/rts_impls/runtime_common/AsyncMultiFabUtil.cpp:    //        not part of the actual crse multifab which came in.
+Src/AmrTask/rts_impls/runtime_common/AsyncMultiFabUtil.cpp:    Perilla::multifabCopyPush(RG_crse, RG_fine, S_crse, crse_S_fine, f, scomp, 0, ncomp, 0, 0, false);
+Src/AmrTask/rts_impls/runtime_common/AsyncMultiFabUtil.cpp:    Perilla::multifabCopyPull(RG_crse, RG_fine, S_crse, S_fine, f, scomp, 0, ncomp, 0, 0, false);
+Src/AmrTask/rts_impls/mpi/Perilla.cpp:void Perilla::multifabCopyPull(RegionGraph* destGraph, RegionGraph* srcGraph, MultiFab* mfDst, MultiFab* mfSrc, int f, int dstcomp, int srccomp, int nc, int ng, int ngsrc, bool singleT)
+Src/AmrTask/rts_impls/mpi/Perilla.cpp:    if(mfDst->nComp() < (dstcomp-1)) cout <<"MULTIFAB_COPY_C: nc too large for dst multifab"<< endl;
+Src/AmrTask/rts_impls/mpi/Perilla.cpp:} // multifabCopyPull
+Src/AmrTask/rts_impls/mpi/Perilla.cpp:void Perilla::multifabCopyPushAsync(RegionGraph* destGraph, RegionGraph* srcGraph, MultiFab* mfDst, MultiFab* mfSrc, int f, int dstcomp, int srccomp, int nc, int ng, int ngsrc, bool singleT)
+Src/AmrTask/rts_impls/mpi/Perilla.cpp:    if(mfDst->nComp() < (dstcomp-1)) cout <<"MULTIFAB_COPY_C: nc too large for dst multifab"<< endl;
+Src/AmrTask/rts_impls/mpi/Perilla.cpp:    if(mfSrc->nComp() < (srccomp-1)) cout <<"MULTIFAB_COPY_C: nc too large for src multifab"<< endl;
+Src/AmrTask/rts_impls/mpi/Perilla.cpp:} // multifabCopyPushAsync
+Src/AmrTask/rts_impls/mpi/Perilla.cpp:void Perilla::multifabCopyPush(RegionGraph* destGraph, RegionGraph* srcGraph, amrex::MultiFab* mfDst, amrex::MultiFab* mfSrc, int f, int dstcomp, int srccomp, int nc, int ng, int ngsrc, bool singleT)
+Src/AmrTask/rts_impls/mpi/Perilla.cpp:    if(mfDst->nComp() < (dstcomp-1)) cout <<"MULTIFAB_COPY_C: nc too large for dst multifab"<< endl;
+Src/AmrTask/rts_impls/mpi/Perilla.cpp:    if(mfSrc->nComp() < (srccomp-1)) cout <<"MULTIFAB_COPY_C: nc too large for src multifab"<< endl;
+Src/AmrTask/rts_impls/mpi/Perilla.cpp:      //multifabCopyPush_1Team(destGraph,srcGraph,mfDst,mfSrc,f,dstcomp,srccomp,nc,ng,ngsrc,singleT);
+Src/AmrTask/rts_impls/mpi/Perilla.cpp:          multifabCopyLocPush(destGraph,srcGraph,mfDst,mfSrc,f,tid,dstcomp,srccomp,nc,ng,ngsrc);
+Src/AmrTask/rts_impls/mpi/Perilla.cpp:          multifabCopyRmtPush(destGraph,srcGraph,mfDst,mfSrc,f,tid,dstcomp,srccomp,nc,ng,ngsrc);
+Src/AmrTask/rts_impls/mpi/Perilla.cpp:      multifabCopyPush_1Team(destGraph,srcGraph,mfDst,mfSrc,f,tid,dstcomp,srccomp,nc,ng,ngsrc,singleT);
+Src/AmrTask/rts_impls/mpi/Perilla.cpp:    multifabCopyPush_1Team(destGraph,srcGraph,mfDst,mfSrc,f,dstcomp,srccomp,nc,ng,ngsrc,singleT);
+Src/AmrTask/rts_impls/mpi/Perilla.cpp:  void Perilla::multifabCopyPush_1Team(RegionGraph* destGraph, RegionGraph* srcGraph, amrex::MultiFab* mfDst, amrex::MultiFab* mfSrc, int f, int dstcomp, int srccomp, int nc, int ng, int ngsrc, bool singleT)
+Src/AmrTask/rts_impls/mpi/Perilla.cpp:  } // multifabCopyPush
+Src/AmrTask/rts_impls/mpi/PerillaRts.cpp:            // Do a coarse timestep, which calls one or multiple timestep updates (i.e. timeStep()) at each AMR level
+Src/AmrTask/rts_impls/mpi_omp/Perilla.cpp:void Perilla::multifabBuildFabCon(RegionGraph* rg, const MultiFab& mf, const Periodicity& period)
+Src/AmrTask/rts_impls/mpi_omp/Perilla.cpp:	    //bool cc = !mf->is_nodal(); //  cc = multifab_cell_centered_q(mf)
+Src/AmrTask/rts_impls/mpi_omp/Perilla.cpp:	    //bool cc = !mf->is_nodal(); //  cc = multifab_cell_centered_q(mf)
+Src/AmrTask/rts_impls/mpi_omp/Perilla.cpp:}// multifabBuildFabCon
+Src/AmrTask/rts_impls/mpi_omp/Perilla.cpp:void Perilla::multifabExtractCopyAssoc(RegionGraph* gDst, RegionGraph* gSrc, const MultiFab& mfDst, const MultiFab& mfSrc, int nc, int ng, int ngSrc, const Periodicity& period)
+Src/AmrTask/rts_impls/mpi_omp/Perilla.cpp:} // multifabExtractCopyAssoc
+Src/AmrTask/rts_impls/mpi_omp/Perilla.cpp:void Perilla::multifabExtractCopyAssoc(RegionGraph* gDst, RegionGraph* gSrc, const MultiFab& mfDst, const MultiFab& mfSrc, const Periodicity& period) 
+Src/AmrTask/rts_impls/mpi_omp/Perilla.cpp:    multifabExtractCopyAssoc(gDst, gSrc, mfDst, mfSrc, 1, 0, 0, period);
+Src/AmrTask/rts_impls/mpi_omp/Perilla.cpp:void Perilla::multifabCopyPushAsync(RegionGraph* destGraph, RegionGraph* srcGraph, MultiFab* mfDst, MultiFab* mfSrc, int f, int dstcomp, int srccomp, int nc, int ng, int ngsrc, bool singleT)
+Src/AmrTask/rts_impls/mpi_omp/Perilla.cpp:    if(mfDst->nComp() < (dstcomp-1)) cout <<"MULTIFAB_COPY_C: nc too large for dst multifab"<< endl;
+Src/AmrTask/rts_impls/mpi_omp/Perilla.cpp:    if(mfSrc->nComp() < (srccomp-1)) cout <<"MULTIFAB_COPY_C: nc too large for src multifab"<< endl;
+Src/AmrTask/rts_impls/mpi_omp/Perilla.cpp:} // multifabCopyPushAsync
+Src/AmrTask/rts_impls/mpi_omp/Perilla.cpp:void Perilla::multifabCopyPushAsync(RegionGraph* destGraph, RegionGraph* srcGraph, MultiFab* mfDst, MultiFab* mfSrc, int f, bool singleT) 
+Src/AmrTask/rts_impls/mpi_omp/Perilla.cpp:    multifabCopyPushAsync(destGraph, srcGraph, mfDst, mfSrc, f, 1, 1, 1, 0, 0, singleT);
+Src/AmrTask/rts_impls/mpi_omp/Perilla.cpp:void Perilla::multifabCopyPush(RegionGraph* destGraph, RegionGraph* srcGraph, amrex::MultiFab* mfDst, amrex::MultiFab* mfSrc, int f, int dstcomp, int srccomp, int nc, int ng, int ngsrc, bool singleT)
+Src/AmrTask/rts_impls/mpi_omp/Perilla.cpp:    if(mfDst->nComp() < (dstcomp-1)) cout <<"MULTIFAB_COPY_C: nc too large for dst multifab"<< endl;
+Src/AmrTask/rts_impls/mpi_omp/Perilla.cpp:    if(mfSrc->nComp() < (srccomp-1)) cout <<"MULTIFAB_COPY_C: nc too large for src multifab"<< endl;
+Src/AmrTask/rts_impls/mpi_omp/Perilla.cpp:    multifabCopyPush_1Team(destGraph,srcGraph,mfDst,mfSrc,f,dstcomp,srccomp,nc,ng,ngsrc,singleT);
+Src/AmrTask/rts_impls/mpi_omp/Perilla.cpp:  void Perilla::multifabCopyPush_1Team(RegionGraph* destGraph, RegionGraph* srcGraph, amrex::MultiFab* mfDst, amrex::MultiFab* mfSrc, int f, int dstcomp, int srccomp, int nc, int ng, int ngsrc, bool singleT)
+Src/AmrTask/rts_impls/mpi_omp/Perilla.cpp:  } // multifabCopyPush
+Src/AmrTask/rts_impls/mpi_omp/Perilla.cpp:void Perilla::multifabCopyPush(RegionGraph* destGraph, RegionGraph* srcGraph, amrex::MultiFab* mfDst, amrex::MultiFab* mfSrc, int f, bool singleT)
+Src/AmrTask/rts_impls/mpi_omp/Perilla.cpp:    multifabCopyPush(destGraph, srcGraph, mfDst, mfSrc, f, 1, 1, 1, 0, 0, singleT);
+Src/AmrTask/rts_impls/mpi_omp/Perilla.cpp:void Perilla::multifabCopyPull(RegionGraph* destGraph, RegionGraph* srcGraph, MultiFab* mfDst, MultiFab* mfSrc, int f, int dstcomp, int srccomp, int nc, int ng, int ngsrc, bool singleT)
+Src/AmrTask/rts_impls/mpi_omp/Perilla.cpp:    if(mfDst->nComp() < (dstcomp-1)) cout <<"MULTIFAB_COPY_C: nc too large for dst multifab"<< endl;
+Src/AmrTask/rts_impls/mpi_omp/Perilla.cpp:    //if(mfSrc->nComp() < (srccomp-1)) cout <<"MULTIFAB_COPY_C: nc too large for src multifab"<< endl;
+Src/AmrTask/rts_impls/mpi_omp/Perilla.cpp:} // multifabCopyPull
+Src/AmrTask/rts_impls/mpi_omp/Perilla.cpp:void Perilla::multifabCopyPull(RegionGraph* destGraph, RegionGraph* srcGraph, MultiFab* mfDst, MultiFab* mfSrc, int f, bool singleT) 
+Src/AmrTask/rts_impls/mpi_omp/Perilla.cpp:    multifabCopyPull(destGraph, srcGraph, mfDst, mfSrc, f, 1, 1, 1, 0, 0,singleT);
+Src/AmrTask/rts_impls/mpi_omp/PerillaRts.cpp:            // Do a coarse timestep, which calls one or multiple timestep updates (i.e. timeStep()) at each AMR level
+Src/AmrTask/rts_impls/mpi_omp/AsyncMultiFabUtil.cpp:    Perilla::multifabCopyPushAsync(RG_crse, RG_fine, &S_crse, &crse_S_fine, f, scomp, 0, ncomp, 0, 0, false);
+Src/AmrTask/rts_impls/mpi_omp/AsyncMultiFabUtil.cpp:    Perilla::multifabCopyPull(RG_crse, RG_fine, &S_crse, &S_fine, f, scomp, 0, ncomp, 0, 0, false);
+Src/AmrTask/rts_impls/mpi_omp/AsyncMultiFabUtil.cpp:    Perilla::multifabCopyPushAsync(RG_crse, RG_fine, &S_crse, &crse_S_fine, f, scomp, 0, ncomp, 0, 0, false);
+Src/AmrTask/rts_impls/mpi_omp/AsyncMultiFabUtil.cpp:    Perilla::multifabCopyPull(RG_crse, RG_fine, &S_crse, &S_fine, f, scomp, 0, ncomp, 0, 0, false);
+Src/AmrTask/rts_impls/mpi_omp/AsyncMultiFabUtil.cpp:    //        not part of the actual crse multifab which came in.
+Src/AmrTask/rts_impls/mpi_omp/AsyncMultiFabUtil.cpp:    Perilla::multifabCopyPush(RG_crse, RG_fine, S_crse, crse_S_fine, f, scomp, 0, ncomp, 0, 0, false);
+Src/AmrTask/rts_impls/mpi_omp/AsyncMultiFabUtil.cpp:    Perilla::multifabCopyPull(RG_crse, RG_fine, S_crse, S_fine, f, scomp, 0, ncomp, 0, 0, false);
+Src/AmrTask/rts_impls/upcxx/Perilla.cpp:void Perilla::multifabExtractCopyAssoc(RegionGraph* gDst, RegionGraph* gSrc, const MultiFab& mfDst, const MultiFab& mfSrc, int nc, int ng, int ngSrc, const Periodicity& period)
+Src/AmrTask/rts_impls/upcxx/Perilla.cpp:} // multifabExtractCopyAssoc
+Src/AmrTask/rts_impls/upcxx/Perilla.cpp:void Perilla::multifabExtractCopyAssoc(RegionGraph* gDst, RegionGraph* gSrc, const MultiFab& mfDst, const MultiFab& mfSrc, int nc, int ng, int ngSrc, const Periodicity& period)
+Src/AmrTask/rts_impls/upcxx/Perilla.cpp:} // multifabExtractCopyAssoc
+Src/AmrTask/rts_impls/upcxx/Perilla.cpp:void Perilla::multifabExtractCopyAssoc(RegionGraph* gDst, RegionGraph* gSrc, const MultiFab& mfDst, const MultiFab& mfSrc, const Periodicity& period) 
+Src/AmrTask/rts_impls/upcxx/Perilla.cpp:    multifabExtractCopyAssoc(gDst, gSrc, mfDst, mfSrc, 1 /*component*/, 0/*ghost*/, 0/*src ghost*/, period);
+Src/AmrTask/rts_impls/upcxx/Perilla.cpp:void Perilla::multifabCopyPushAsync(RegionGraph* destGraph, RegionGraph* srcGraph, MultiFab* mfDst, MultiFab* mfSrc, int f, int dstcomp, int srccomp, int nc, int ng, int ngsrc, bool singleT)
+Src/AmrTask/rts_impls/upcxx/Perilla.cpp:    if(mfDst->nComp() < (dstcomp-1)) cout <<"MULTIFAB_COPY_C: nc too large for dst multifab"<< endl;
+Src/AmrTask/rts_impls/upcxx/Perilla.cpp:    if(mfSrc->nComp() < (srccomp-1)) cout <<"MULTIFAB_COPY_C: nc too large for src multifab"<< endl;
+Src/AmrTask/rts_impls/upcxx/Perilla.cpp:} // multifabCopyPushAsync
+Src/AmrTask/rts_impls/upcxx/Perilla.cpp:void Perilla::multifabCopyPull(RegionGraph* destGraph, RegionGraph* srcGraph, MultiFab* mfDst, MultiFab* mfSrc, int f, int dstcomp, int srccomp, int nc, int ng, int ngsrc, bool singleT)
+Src/AmrTask/rts_impls/upcxx/Perilla.cpp:    if(mfDst->nComp() < (dstcomp-1)) cout <<"MULTIFAB_COPY_C: nc too large for dst multifab"<< endl;
+Src/AmrTask/rts_impls/upcxx/Perilla.cpp:    //if(mfSrc->nComp() < (srccomp-1)) cout <<"MULTIFAB_COPY_C: nc too large for src multifab"<< endl;
+Src/AmrTask/rts_impls/upcxx/Perilla.cpp:} // multifabCopyPull
+Src/AmrTask/rts_impls/upcxx/Perilla.cpp:void Perilla::multifabCopyPull(RegionGraph* destGraph, RegionGraph* srcGraph, MultiFab* mfDst, MultiFab* mfSrc, int f, bool singleT) 
+Src/AmrTask/rts_impls/upcxx/Perilla.cpp:    multifabCopyPull(destGraph, srcGraph, mfDst, mfSrc, f, 1, 1, 1, 0, 0,singleT);
+Src/AmrTask/rts_impls/upcxx/Perilla.cpp:void Perilla::multifabCopyPushAsync(RegionGraph* destGraph, RegionGraph* srcGraph, MultiFab* mfDst, MultiFab* mfSrc, int f, bool singleT)
+Src/AmrTask/rts_impls/upcxx/Perilla.cpp:    multifabCopyPushAsync(destGraph, srcGraph, mfDst, mfSrc, f, 1, 1, 1, 0, 0, singleT);
+Src/AmrTask/rts_impls/upcxx/Perilla.cpp:void Perilla::multifabCopyPush(RegionGraph* destGraph, RegionGraph* srcGraph, amrex::MultiFab* mfDst, amrex::MultiFab* mfSrc, int f, int dstcomp, int srccomp, int nc, int ng, int ngsrc, bool singleT)
+Src/AmrTask/rts_impls/upcxx/Perilla.cpp:    if(mfDst->nComp() < (dstcomp-1)) cout <<"MULTIFAB_COPY_C: nc too large for dst multifab"<< endl;
+Src/AmrTask/rts_impls/upcxx/Perilla.cpp:    if(mfSrc->nComp() < (srccomp-1)) cout <<"MULTIFAB_COPY_C: nc too large for src multifab"<< endl;
+Src/AmrTask/rts_impls/upcxx/Perilla.cpp:      //multifabCopyPush_1Team(destGraph,srcGraph,mfDst,mfSrc,f,dstcomp,srccomp,nc,ng,ngsrc,singleT);
+Src/AmrTask/rts_impls/upcxx/Perilla.cpp:          multifabCopyLocPush(destGraph,srcGraph,mfDst,mfSrc,f,tid,dstcomp,srccomp,nc,ng,ngsrc);
+Src/AmrTask/rts_impls/upcxx/Perilla.cpp:          multifabCopyRmtPush(destGraph,srcGraph,mfDst,mfSrc,f,tid,dstcomp,srccomp,nc,ng,ngsrc);
+Src/AmrTask/rts_impls/upcxx/Perilla.cpp:      multifabCopyPush_1Team(destGraph,srcGraph,mfDst,mfSrc,f,tid,dstcomp,srccomp,nc,ng,ngsrc,singleT);
+Src/AmrTask/rts_impls/upcxx/Perilla.cpp:    multifabCopyPush_1Team(destGraph,srcGraph,mfDst,mfSrc,f,dstcomp,srccomp,nc,ng,ngsrc,singleT);
+Src/AmrTask/rts_impls/upcxx/Perilla.cpp:  void Perilla::multifabCopyPush_1Team(RegionGraph* destGraph, RegionGraph* srcGraph, amrex::MultiFab* mfDst, amrex::MultiFab* mfSrc, int f, int dstcomp, int srccomp, int nc, int ng, int ngsrc, bool singleT)
+Src/AmrTask/rts_impls/upcxx/Perilla.cpp:  } // multifabCopyPush
+Src/AmrTask/rts_impls/upcxx/PerillaRts.cpp:            // Do a coarse timestep, which calls one or multiple timestep updates (i.e. timeStep()) at each AMR level
+Src/AmrTask/tutorials/MiniApps/Adv_phaseAsync_rgi/Source/Adv_io.cpp:    // We combine all of the multifabs -- state, derived, etc -- into one
+Src/AmrTask/tutorials/MiniApps/Adv_phaseAsync_rgi/Source/Adv_io.cpp:    // multifab -- plotMF.
+Src/AmrTask/tutorials/MiniApps/Adv_phaseAsync_rgi/Source/Adv.cpp:	Perilla::multifabExtractCopyAssoc( RG_S_crse, RG_S_fine, *S_crse, *crse_S_fine, S_fine->nComp(), 0, 0, Periodicity::NonPeriodic());
+Src/AmrTask/tutorials/MiniApps/Adv_Async_OnDemand/Source/Adv_io.cpp:    // We combine all of the multifabs -- state, derived, etc -- into one
+Src/AmrTask/tutorials/MiniApps/Adv_Async_OnDemand/Source/Adv_io.cpp:    // multifab -- plotMF.
+Src/AmrTask/tutorials/MiniApps/Adv_Async_OnDemand/Source/Adv.cpp:	Perilla::multifabExtractCopyAssoc( RG_S_crse, RG_S_fine, *S_crse, *crse_S_fine, S_fine->nComp(), 0, 0, Periodicity::NonPeriodic());
+Src/AmrTask/tutorials/MiniApps/Adv_phaseAsync/Source/Adv_advance.cpp:    //This is the FillPatch on the coarsest level, starting the async execution on multiple AMR levels
+Src/AmrTask/tutorials/MiniApps/Adv_phaseAsync/Source/Adv_io.cpp:    // We combine all of the multifabs -- state, derived, etc -- into one
+Src/AmrTask/tutorials/MiniApps/Adv_phaseAsync/Source/Adv_io.cpp:    // multifab -- plotMF.
+Src/AmrTask/tutorials/MiniApps/Adv_phaseAsync/Source/Adv.cpp:	    Perilla::multifabCopyPull(RG_S_crse, RG_S_fine, tS_crse, tS_fine, f, 0, 0, S_fine->nComp(), 0, 0, false);
+Src/AmrTask/tutorials/MiniApps/Adv_phaseAsync/Source/Adv.cpp:	    Perilla::multifabCopyPushAsync(crse_lev.RG_S_crse, crse_lev.RG_S_fine, tS_crse, tS_fine, f, 0, 0, crse_lev.S_fine->nComp(), 0, 0, false);
+Src/AmrTask/tutorials/MiniApps/Adv_phaseAsync/Source/Adv.cpp:	Perilla::multifabExtractCopyAssoc( RG_S_crse, RG_S_fine, *S_crse, *crse_S_fine, S_fine->nComp(), 0, 0, Periodicity::NonPeriodic());
+Src/AmrTask/tutorials/MiniApps/SMC_fixed_dt/SMC_advance.cpp:    Ua_fab.mult(a, bx, 0, ncomp);
+Src/AmrTask/tutorials/MiniApps/SMC_fixed_dt/SMC.cpp:    build_multifabs();
+Src/AmrTask/tutorials/MiniApps/SMC_fixed_dt/SMC_init.cpp:SMC::build_multifabs ()
+Src/AmrTask/tutorials/MiniApps/HeatEquation/main.cpp:    // we allocate two phi multifabs; one will store the old state, the other the new.
+Src/AmrTask/tutorials/MiniApps/HeatEquation/main.cpp:    // build the flux multifabs
+Src/EB/AMReX_EBFluxRegister.cpp:                m_cfpatch[mfi].mult(m_cfp_mask[mfi],0,i);
+Src/EB/AMReX_EBCellFlag.cpp:        int nregular, nsingle, nmulti, ncovered;
+Src/EB/AMReX_EBCellFlag.cpp:                               &nregular, &nsingle, &nmulti, &ncovered);
+Src/EB/AMReX_EBCellFlag.cpp:        } else if (nmulti > 0) {
+Src/EB/AMReX_EBCellFlag.cpp:            t = FabType::multivalued;
+Src/EB/AMReX_EBInterpolater.cpp:        if (ftype == FabType::multivalued || ctype == FabType::multivalued)
+Src/EB/AMReX_EBInterpolater.cpp:            amrex::Abort("EBCellConservativeLinear::interp: multivalued not implemented");
+Src/EB/AMReX_EBMultiFabUtil.cpp:            amrex::Abort("multi-valued avgdown to be implemented");
+Src/EB/AMReX_EBMultiFabUtil.cpp:                    amrex::Abort("multi-valued avgdown to be implemented");
+Src/EB/AMReX_EB_LSCoreBase.cpp://             - sizes multilevel arrays and data structures
+Src/EB/AMReX_EB_LSCoreBase.cpp:// Initializes multilevel data
+Src/EB/AMReX_EB_LSCoreBase.cpp:// Fill an entire multifab by interpolating from the coarser level.
+Src/EB/AMReX_EB_LSCoreBase.cpp:// multiple levels
+Src/EB/AMReX_EB_LSCoreBase.cpp:// Compute a new multifab by coping in phi from valid region and filling ghost
+Src/EB/AMReX_EB_LSCoreBase.cpp:// Fill an entire multifab by interpolating from the coarser level. This comes
+Src/EB/AMReX_EB_LSCoreBase.cpp:// Put together an array of multifabs for writing
+Src/SDC/AMReX_SDCstruct.cpp:  //  Assign  geomety and multifab info
+Src/AmrCore/AMReX_FluxRegister.cpp:                        Real            mult,
+Src/AmrCore/AMReX_FluxRegister.cpp:            dfab(i,j,k,n) = sfab(i,j,k,n+srccomp)*mult*afab(i,j,k);
+Src/AmrCore/AMReX_FluxRegister.cpp:                        Real            mult,
+Src/AmrCore/AMReX_FluxRegister.cpp:    CrseInit(mflx,area,dir,srccomp,destcomp,numcomp,mult,op);
+Src/AmrCore/AMReX_FluxRegister.cpp:                       Real            mult,
+Src/AmrCore/AMReX_FluxRegister.cpp:            dfab(i,j,k,n) = sfab(i,j,k,n+srccomp)*mult*afab(i,j,k);
+Src/AmrCore/AMReX_FluxRegister.cpp:                       Real            mult,
+Src/AmrCore/AMReX_FluxRegister.cpp:    CrseAdd(mflx,area,dir,srccomp,destcomp,numcomp,mult,geom);
+Src/AmrCore/AMReX_FluxRegister.cpp:                       Real            mult)
+Src/AmrCore/AMReX_FluxRegister.cpp:        FineAdd(mflx[mfi],dir,k,srccomp,destcomp,numcomp,mult,RunOn::Gpu);
+Src/AmrCore/AMReX_FluxRegister.cpp:                       Real            mult)
+Src/AmrCore/AMReX_FluxRegister.cpp:        FineAdd(mflx[mfi],area[mfi],dir,k,srccomp,destcomp,numcomp,mult,RunOn::Gpu);
+Src/AmrCore/AMReX_FluxRegister.cpp:                       Real             mult,
+Src/AmrCore/AMReX_FluxRegister.cpp:                          numcomp, dir, local_ratio, mult);
+Src/AmrCore/AMReX_FluxRegister.cpp:                          numcomp, dir, local_ratio, mult);
+Src/AmrCore/AMReX_FluxRegister.cpp:                       Real             mult,
+Src/AmrCore/AMReX_FluxRegister.cpp:                              numcomp, dir, local_ratio, mult);
+Src/AmrCore/AMReX_FluxRegister.cpp:                              numcomp, dir, local_ratio, mult);
+Src/AmrCore/AMReX_AmrMesh.cpp:    // Check that domain size is a multiple of blocking_factor[0].
+Src/AmrCore/AMReX_AmrMesh.cpp:    // Check that max_grid_size is a multiple of blocking_factor at every level.
+Src/Extern/Conduit/AMReX_Conduit_Blueprint.cpp:    // prepare inputs  so we can call the multi-level case
+Src/Extern/Conduit/AMReX_Conduit_Blueprint.cpp:    // call multi-level case
+Src/Extern/Conduit/AMReX_Conduit_Blueprint.cpp:    // for a multi-domain mesh 
+Src/Extern/amrdata/AMReX_DataServices.cpp:// a MultiFab and pass the proc number for the multifabs disributionMapping
+Src/Extern/amrdata/AMReX_DataServices.cpp:// a MultiFab and pass the proc number for the multifabs disributionMapping
+Src/Extern/amrdata/AMReX_DataServices.cpp:    // ---- now the real data is in the multifab, avg down to a reasonable size
+Src/Extern/amrdata/AMReX_DataServices.cpp:      std::multimap<Real, int> nCallMap;
+Src/Extern/amrdata/AMReX_DataServices.cpp:        std::multimap<Real,int>::iterator ubMIter, mIter;
+Src/Extern/amrdata/AMReX_DataServices.cpp:    // ---- now the real data is in the multifab, avg down to a reasonable size
+Src/Extern/amrdata/AMReX_DataServices.cpp:    std::multimap<Real, CommProfStats::SendRecvPairUnpaired> srMMap;  // [call time, sr]
+Src/Extern/amrdata/AMReX_DataServices.cpp:      std::multimap<Real, CommProfStats::SendRecvPairUnpaired>::iterator it;
+Src/Extern/amrdata/AMReX_AmrData.cpp:      // here we account for multiple multifabs in a plot file
+Src/Extern/amrdata/AMReX_AmrData.cpp:          // make single component multifabs
+Src/Extern/amrdata/AMReX_AmrData.cpp:      // set the level zero multifab
+Src/Extern/amrdata/AMReX_AmrData.cpp:      // set the level one multifab
+Src/Extern/amrdata/AMReX_AmrData.cpp:      // here we account for multiple multifabs in a plot file
+Src/Extern/amrdata/AMReX_AmrData.cpp:          // make single component multifabs for level one
+Src/Extern/amrdata/AMReX_AmrData.cpp:    MultiFabCopyDescriptor multiFabCopyDesc;
+Src/Extern/amrdata/AMReX_AmrData.cpp:           multiFabCopyDesc.RegisterFabArray(dataGrids[currentLevel][stateIndex]);
+Src/Extern/amrdata/AMReX_AmrData.cpp:		      multiFabCopyDesc.AddBox(stateDataMFId[currentLevel],
+Src/Extern/amrdata/AMReX_AmrData.cpp:    multiFabCopyDesc.CollectData();
+Src/Extern/amrdata/AMReX_AmrData.cpp:            multiFabCopyDesc.FillFab(stateDataMFId[currLevel],
+Src/Extern/amrdata/AMReX_AmrData.cpp:    MultiFabCopyDescriptor multiFabCopyDesc;
+Src/Extern/amrdata/AMReX_AmrData.cpp:           multiFabCopyDesc.RegisterFabArray(dataGrids[currentLevel][stateIndex]);
+Src/Extern/amrdata/AMReX_AmrData.cpp:		      multiFabCopyDesc.AddBox(stateDataMFId[currentLevel],
+Src/Extern/amrdata/AMReX_AmrData.cpp:    multiFabCopyDesc.CollectData();
+Src/Extern/amrdata/AMReX_AmrData.cpp:            multiFabCopyDesc.FillFab(stateDataMFId[currLevel],
+Src/Extern/amrdata/AMReX_AmrData.cpp:  //  first, test if onBox completely contains each multifab box
+Src/Extern/hpgmg/BL_HPGMG.cpp:// If we want to use the multigrid solver from HPGMG then we must convert our
+Src/Extern/ProfParser/AMReX_CommProfStats.cpp:using std::unordered_multimap;
+Src/Extern/ProfParser/AMReX_CommProfStats.cpp:void CommProfStats::SendRecvList(std::multimap<Real, SendRecvPairUnpaired> &srMMap)
+Src/Extern/ProfParser/AMReX_CommProfStats.cpp:  Vector<unordered_map<int, unordered_multimap<long, SendRecvPairUnpaired> > > unpairedMessages;
+Src/Extern/ProfParser/AMReX_CommProfStats.cpp:    map<int, multimap<int, int> > idbMM;    // [time, [proc, index]]
+Src/Extern/ProfParser/AMReX_CommProfStats.cpp:    map<int, multimap<int, int> >::iterator idb_m_MMiter;
+Src/Extern/ProfParser/AMReX_CommProfStats.cpp:    multimap<int, int>::iterator idbMMiter;
+Src/Extern/ProfParser/AMReX_CommProfStats.cpp:      multimap<int, int> &mm = idb_m_MMiter->second;
+Src/Extern/ProfParser/AMReX_CommProfStats.cpp:	pair<unordered_multimap<long, SendRecvPairUnpaired>::iterator,
+Src/Extern/ProfParser/AMReX_CommProfStats.cpp:	     unordered_multimap<long, SendRecvPairUnpaired>::iterator> upmSRPERI;
+Src/Extern/ProfParser/AMReX_CommProfStats.cpp:	Vector<unordered_multimap<long, SendRecvPairUnpaired>::iterator> upmSRPMatchSave;
+Src/Extern/ProfParser/AMReX_CommProfStats.cpp:	unordered_multimap<long, SendRecvPairUnpaired> &upm = unpairedMessages[myThread][cs.tag];
+Src/Extern/ProfParser/AMReX_CommProfStats.cpp:	for(unordered_multimap<long, SendRecvPairUnpaired>::iterator upmsrit = upmSRPERI.first;
+Src/Extern/ProfParser/AMReX_CommProfStats.cpp:	  unordered_multimap<long, SendRecvPairUnpaired>::iterator
+Src/Extern/ProfParser/AMReX_BLProfStats.cpp:using std::unordered_multimap;
+Src/Extern/ProfParser/AMReX_RegionsProfStats.cpp:using std::unordered_multimap;
+Src/Extern/SENSEI/AMReX_AmrMeshDataAdaptor.cpp:    // find the indices of the multifab and component within for
+Src/Extern/SENSEI/AMReX_AmrDataAdaptor.cpp:    // find the indices of the multifab and component within for
+Src/Extern/PETSc/AMReX_PETSc.cpp:            rhsfab.mult(diaginv[mfi]);
+Src/Extern/HYPRE/AMReX_HypreABecLap2.cpp:        rhsfab.mult(diaginv[mfi]);
+Src/Extern/HYPRE/AMReX_HypreABecLap.cpp:        rhsfab.mult(diaginv[mfi]);
+Src/Extern/HYPRE/AMReX_HypreABecLap3.cpp:            rhsfab.mult(diaginv[mfi]);
+Src/Particle/AMReX_TracerParticles.cpp:    // mf       -> the multifab
+Src/Base/AMReX_Machine.cpp:                // multiply distance by number of rank pairs across the two nodes
+Src/Base/AMReX_Machine.cpp:                // multiply distance by number of rank pairs across the two nodes
+Src/Base/AMReX_iMultiFab.cpp:iMultiFab::mult (int val,
+Src/Base/AMReX_iMultiFab.cpp:    mult(val,0,n_comp,nghost);
+Src/Base/AMReX_iMultiFab.cpp:iMultiFab::mult (int       val,
+Src/Base/AMReX_iMultiFab.cpp:    mult(val,region,0,n_comp,nghost);
+Src/Base/AMReX_iMultiFab.cpp:iMultiFab::mult (int val,
+Src/Base/AMReX_iMultiFab.cpp:    FabArray<IArrayBox>::mult(val,comp,num_comp,nghost);
+Src/Base/AMReX_iMultiFab.cpp:iMultiFab::mult (int       val,
+Src/Base/AMReX_iMultiFab.cpp:    FabArray<IArrayBox>::mult(val,region,comp,num_comp,nghost);
+Src/Base/AMReX_iMultiFab.cpp:    FabArray<IArrayBox>::mult(-1,comp,num_comp,nghost);
+Src/Base/AMReX_iMultiFab.cpp:    FabArray<IArrayBox>::mult(-1,region,comp,num_comp,nghost);
+Src/Base/AMReX_MultiFabUtil.cpp:        // define the multifab that stores slice
+Src/Base/AMReX_MultiFabUtil.cpp:                //        not part of the actual crse multifab which came in.
+Src/Base/AMReX_GpuDevice.cpp:        amrex::Abort("When using CUDA with MPI, if multiple devices are visible to each rank, MPI-3.0 must be supported.");
+Src/Base/AMReX_GpuDevice.cpp:        // Should make multiple options for building for future flexibility.
+Src/Base/AMReX_GpuDevice.cpp:        // Should make multiple options for building for future flexibility.
+Src/Base/AMReX_GpuDevice.cpp:    int num_SMs = device_prop.multiProcessorCount;
+Src/Base/AMReX_GpuDevice.cpp:    int SM_mult_factor = 32;
+Src/Base/AMReX_GpuDevice.cpp:        numBlocks.y = SM_mult_factor;
+Src/Base/AMReX_GpuDevice.cpp:    int num_SMs = device_prop.multiProcessorCount;
+Src/Base/AMReX_GpuDevice.cpp:    int SM_mult_factor = 32;
+Src/Base/AMReX_GpuDevice.cpp:        numBlocks.y = SM_mult_factor;
+Src/Base/AMReX_MultiFab.cpp:    int num_multifabs     = 0;
+Src/Base/AMReX_MultiFab.cpp:    int num_multifabs_hwm = 0;
+Src/Base/AMReX_MultiFab.cpp:MultiFab::mult (Real val,
+Src/Base/AMReX_MultiFab.cpp:    mult(val,0,n_comp,nghost);
+Src/Base/AMReX_MultiFab.cpp:MultiFab::mult (Real       val,
+Src/Base/AMReX_MultiFab.cpp:    mult(val,region,0,n_comp,nghost);
+Src/Base/AMReX_MultiFab.cpp:			 return {num_multifabs, num_multifabs_hwm};
+Src/Base/AMReX_MultiFab.cpp:    ++num_multifabs;
+Src/Base/AMReX_MultiFab.cpp:    num_multifabs_hwm = std::max(num_multifabs_hwm, num_multifabs);
+Src/Base/AMReX_MultiFab.cpp:    ++num_multifabs;
+Src/Base/AMReX_MultiFab.cpp:    num_multifabs_hwm = std::max(num_multifabs_hwm, num_multifabs);
+Src/Base/AMReX_MultiFab.cpp:    ++num_multifabs;
+Src/Base/AMReX_MultiFab.cpp:    num_multifabs_hwm = std::max(num_multifabs_hwm, num_multifabs);
+Src/Base/AMReX_MultiFab.cpp:    ++num_multifabs;
+Src/Base/AMReX_MultiFab.cpp:    num_multifabs_hwm = std::max(num_multifabs_hwm, num_multifabs);
+Src/Base/AMReX_MultiFab.cpp:    --num_multifabs;
+Src/Base/AMReX_MultiFab.cpp:MultiFab::mult (Real val,
+Src/Base/AMReX_MultiFab.cpp:    FabArray<FArrayBox>::mult(val,comp,num_comp,nghost);
+Src/Base/AMReX_MultiFab.cpp:MultiFab::mult (Real       val,
+Src/Base/AMReX_MultiFab.cpp:    FabArray<FArrayBox>::mult(val,region,comp,num_comp,nghost);
+Src/Base/AMReX_MultiFab.cpp:    FabArray<FArrayBox>::mult(-1., comp, num_comp, nghost);
+Src/Base/AMReX_MultiFab.cpp:    FabArray<FArrayBox>::mult(-1.,region,comp,num_comp,nghost);
+Src/Base/AMReX_VisMF.cpp:    std::multiset<int> availableFiles;  // [whichFile]  supports multiple reads/file
+Src/Base/AMReX_VisMF.cpp:        std::multiset<int>::iterator aFilesIter;
+Src/Base/AMReX_parstream.cpp://  Parallel is hard because the app can call setPoutBaseName() multiple
+Src/Base/AMReX_MemPool.cpp:	//Just in case Perilla thread spawns multiple OMP threads
+Src/Base/AMReX_MultiFabUtil_Perilla.cpp:	//        not part of the actual crse multifab which came in.
+Src/Base/AMReX_MultiFabUtil_Perilla.cpp:	Perilla::multifabCopyPush( RG_crse, RG_fine, &S_crse, &crse_S_fine, f, scomp, 0, ncomp, 0, 0, false);
+Src/Base/AMReX_MultiFabUtil_Perilla.cpp:	Perilla::multifabCopyPull( RG_crse, RG_fine, &S_crse, &S_fine, f,scomp, 0, ncomp, 0, 0, false);
+Src/Base/AMReX_MultiFabUtil_Perilla.cpp:	Perilla::multifabCopyPush( RG_crse, RG_fine, &S_crse, &crse_S_fine, f, scomp, 0, ncomp, 0, 0, false);
+Src/Base/AMReX_MultiFabUtil_Perilla.cpp:	Perilla::multifabCopyPull(rgi, RG_crse, RG_fine, &S_crse, &S_fine, f, scomp, 0, ncomp, 0, 0, false);
+Src/Base/AMReX_ForkJoin.cpp:// multiple MultiFabs may share the same box array
+Src/F_Interfaces/LinearSolvers/AMReX_multigrid_fi.cpp:     void amrex_fi_new_multigrid (MLMG*& mlmg, MLLinOp* lp)
+Src/F_Interfaces/LinearSolvers/AMReX_multigrid_fi.cpp:     void amrex_fi_delete_multigrid (MLMG* mlmg)
+Src/F_Interfaces/LinearSolvers/AMReX_multigrid_fi.cpp:     Real amrex_fi_multigrid_solve (MLMG* mlmg, MultiFab* a_sol[], MultiFab* a_rhs[],
+Src/F_Interfaces/LinearSolvers/AMReX_multigrid_fi.cpp:     void amrex_fi_multigrid_get_grad_solution (MLMG* mlmg, MultiFab* a_grad_sol[])
+Src/F_Interfaces/LinearSolvers/AMReX_multigrid_fi.cpp:     void amrex_fi_multigrid_get_fluxes (MLMG* mlmg, MultiFab* a_fluxes[])
+Src/F_Interfaces/LinearSolvers/AMReX_multigrid_fi.cpp:     void amrex_fi_multigrid_comp_residual (MLMG* mlmg, MultiFab* a_res[], MultiFab* a_sol[],
+Src/F_Interfaces/LinearSolvers/AMReX_multigrid_fi.cpp:     void amrex_fi_multigrid_set_verbose (MLMG* mlmg, int v)
+Src/F_Interfaces/LinearSolvers/AMReX_multigrid_fi.cpp:     void amrex_fi_multigrid_set_max_iter (MLMG* mlmg, int n)
+Src/F_Interfaces/LinearSolvers/AMReX_multigrid_fi.cpp:     void amrex_fi_multigrid_set_max_fmg_iter (MLMG* mlmg, int n)
+Src/F_Interfaces/LinearSolvers/AMReX_multigrid_fi.cpp:     void amrex_fi_multigrid_set_bottom_solver (MLMG* mlmg, int s)
+Src/F_Interfaces/LinearSolvers/AMReX_multigrid_fi.cpp:             amrex::Abort("amrex_fi_multigrid_set_bottom_solver: unknown bottom solver");
+Src/F_Interfaces/LinearSolvers/AMReX_multigrid_fi.cpp:     void amrex_fi_multigrid_set_cg_verbose (MLMG* mlmg, int n)
+Src/F_Interfaces/LinearSolvers/AMReX_multigrid_fi.cpp:     void amrex_fi_multigrid_set_always_use_bnorm (MLMG* mlmg, int f)
+Src/F_Interfaces/LinearSolvers/AMReX_multigrid_fi.cpp:     void amrex_fi_multigrid_set_final_fill_bc (MLMG* mlmg, int f)
+Src/F_Interfaces/AmrCore/AMReX_FAmrCore.cpp:                             + " is not a multiple of amr.blocking_factor = "
+Src/F_Interfaces/AmrCore/AMReX_FAmrCore.cpp:                             + " is not a multiple of ref_ratio = " + std::to_string(rr));
+Src/F_Interfaces/Base/AMReX_multifab_fi.cpp:    void amrex_fi_new_multifab (MultiFab*& mf, const BoxArray*& ba, 
+Src/F_Interfaces/Base/AMReX_multifab_fi.cpp:    void amrex_fi_new_multifab_alias (MultiFab*& mf, const MultiFab* srcmf, int comp, int ncomp)
+Src/F_Interfaces/Base/AMReX_multifab_fi.cpp:    void amrex_fi_delete_multifab (MultiFab* mf)
+Src/F_Interfaces/Base/AMReX_multifab_fi.cpp:    int amrex_fi_multifab_ncomp (const MultiFab* mf)
+Src/F_Interfaces/Base/AMReX_multifab_fi.cpp:    int amrex_fi_multifab_ngrow (const MultiFab* mf)
+Src/F_Interfaces/Base/AMReX_multifab_fi.cpp:    const BoxArray* amrex_fi_multifab_boxarray (const MultiFab* mf)
+Src/F_Interfaces/Base/AMReX_multifab_fi.cpp:    const DistributionMapping* amrex_fi_multifab_distromap (const MultiFab* mf)
+Src/F_Interfaces/Base/AMReX_multifab_fi.cpp:    void amrex_fi_multifab_dataptr_iter (MultiFab* mf, MFIter* mfi, Real*& dp, int lo[3], int hi[3])
+Src/F_Interfaces/Base/AMReX_multifab_fi.cpp:    void amrex_fi_multifab_dataptr_int (MultiFab* mf, int igrd, Real*& dp, int lo[3], int hi[3])
+Src/F_Interfaces/Base/AMReX_multifab_fi.cpp:    Real amrex_fi_multifab_min (const MultiFab* mf, int comp, int nghost)
+Src/F_Interfaces/Base/AMReX_multifab_fi.cpp:    Real amrex_fi_multifab_max (const MultiFab* mf, int comp, int nghost)
+Src/F_Interfaces/Base/AMReX_multifab_fi.cpp:    Real amrex_fi_multifab_sum (const MultiFab* mf, int comp)
+Src/F_Interfaces/Base/AMReX_multifab_fi.cpp:    Real amrex_fi_multifab_norm0 (const MultiFab* mf, int comp)
+Src/F_Interfaces/Base/AMReX_multifab_fi.cpp:    Real amrex_fi_multifab_norm1 (const MultiFab* mf, int comp)
+Src/F_Interfaces/Base/AMReX_multifab_fi.cpp:    Real amrex_fi_multifab_norm2 (const MultiFab* mf, int comp)
+Src/F_Interfaces/Base/AMReX_multifab_fi.cpp:    void amrex_fi_multifab_setval (MultiFab* mf, Real val, int ic, int nc, int ng)
+Src/F_Interfaces/Base/AMReX_multifab_fi.cpp:    void amrex_fi_multifab_plus (MultiFab* mf, Real val, int ic, int nc, int ng)
+Src/F_Interfaces/Base/AMReX_multifab_fi.cpp:    void amrex_fi_multifab_mult (MultiFab* mf, Real val, int ic, int nc, int ng)
+Src/F_Interfaces/Base/AMReX_multifab_fi.cpp:        mf->mult(val, ic, nc, ng);
+Src/F_Interfaces/Base/AMReX_multifab_fi.cpp:    void amrex_fi_multifab_add (MultiFab* dstmf, const MultiFab* srcmf,
+Src/F_Interfaces/Base/AMReX_multifab_fi.cpp:    void amrex_fi_multifab_subtract (MultiFab* dstmf, const MultiFab* srcmf,
+Src/F_Interfaces/Base/AMReX_multifab_fi.cpp:    void amrex_fi_multifab_multiply (MultiFab* dstmf, const MultiFab* srcmf,
+Src/F_Interfaces/Base/AMReX_multifab_fi.cpp:    void amrex_fi_multifab_divide (MultiFab* dstmf, const MultiFab* srcmf,
+Src/F_Interfaces/Base/AMReX_multifab_fi.cpp:    void amrex_fi_multifab_saxpy (MultiFab* dstmf, Real a, const MultiFab* srcmf,
+Src/F_Interfaces/Base/AMReX_multifab_fi.cpp:    void amrex_fi_multifab_lincomb (MultiFab* dstmf,
+Src/F_Interfaces/Base/AMReX_multifab_fi.cpp:    void amrex_fi_multifab_copy (MultiFab* dstmf, const MultiFab* srcmf,
+Src/F_Interfaces/Base/AMReX_multifab_fi.cpp:    void amrex_fi_multifab_parallelcopy (MultiFab* dstmf, const MultiFab* srcmf,
+Src/F_Interfaces/Base/AMReX_multifab_fi.cpp:    void amrex_fi_multifab_fill_boundary (MultiFab* mf, const Geometry* geom, 
+Src/F_Interfaces/Base/AMReX_multifab_fi.cpp:    void amrex_fi_build_owner_imultifab (iMultiFab*& msk, const BoxArray*& ba,
+Src/F_Interfaces/Base/AMReX_multifab_fi.cpp:    void amrex_fi_multifab_override_sync (MultiFab* mf, const Geometry* geom)
+Src/F_Interfaces/Base/AMReX_multifab_fi.cpp:    void amrex_fi_multifab_override_sync_mask (MultiFab* mf, const Geometry* geom, const iMultiFab* msk)
+Src/F_Interfaces/Base/AMReX_multifab_fi.cpp:    void amrex_fi_multifab_sum_boundary (MultiFab* mf, const Geometry* geom, int icomp, int ncomp)
+Src/F_Interfaces/Base/AMReX_multifab_fi.cpp:    void amrex_fi_multifab_average_sync (MultiFab* mf, const Geometry* geom)
+Src/F_Interfaces/Base/AMReX_multifab_fi.cpp:    void amrex_fi_new_imultifab (iMultiFab*& imf, const BoxArray*& ba, 
+Src/F_Interfaces/Base/AMReX_multifab_fi.cpp:    void amrex_fi_new_imultifab_alias (iMultiFab*& mf, const iMultiFab* srcmf, int comp, int ncomp)
+Src/F_Interfaces/Base/AMReX_multifab_fi.cpp:    void amrex_fi_delete_imultifab (iMultiFab* imf)
+Src/F_Interfaces/Base/AMReX_multifab_fi.cpp:    void amrex_fi_imultifab_dataptr (iMultiFab* imf, MFIter* mfi, int*& dp, int lo[3], int hi[3])
+Src/F_Interfaces/Base/AMReX_multifab_fi.cpp:    void amrex_fi_imultifab_setval (iMultiFab* imf, int val, int ic, int nc, int ng)
+Src/F_Interfaces/Base/AMReX_vismf_fi.cpp:    void amrex_fi_write_multifab (const MultiFab* mf, const char* name)
+Src/F_Interfaces/Base/AMReX_vismf_fi.cpp:    void amrex_fi_read_multifab (MultiFab* mf, const char* name)
+Tests/HDF5Benchmark/WritePlotfileHDF5.cpp:      config_ptr.flash_multiple = 0.5;
+Tests/BaseFabTesting/main.cpp:    // mult
+Tests/BaseFabTesting/main.cpp:           fab1.mult(fab2, bx2, bx1, 0, 0, ncomps);
+Tests/BaseFabTesting/main.cpp:        amrex::Print() << "BaseFab<Real>::mult() test." << std::endl
+Tests/BaseFabTesting/main.cpp:    // mult & divide 
+Tests/LinearSolvers/ComparisonTest/writePlotFile.cpp:      // We combine all of the multifabs 
+Tests/LinearSolvers/C_CellMG/macprojTest.cpp:// grid files for this test utility.  The boundary data and multifabs will 
+Tests/LinearSolvers/C_CellMG/MacOperator.cpp:// Define the meaning of gradient for the multigrid object.
+Tests/LinearSolvers/C_CellMG/MacOperator.cpp:// This function creates the initial rhs for use in the mac multgrid solve.
+Tests/LinearSolvers/C_CellMG/MacOperator.cpp:    Rhs.mult(-1.0,Rhs.nGrow());
+Tests/LinearSolvers/C_CellMG/MacOperator.cpp:    Rhs.mult(-1.0,Rhs.nGrow());
+Tests/LinearSolvers/EBTensor/MyTest.cpp:        error.mult(dx[0]*dx[1]*dx[2]);
+Tests/GPU/FusedLaunches/main.cpp:        // fusedLaunch (src, dst,     label, srcVal, dstVal, Ncomp, cellsPerThread, simultaneousBoxes, numLaunches);
+Tests/IOBenchmark/IOTest.cpp:  Vector<MultiFab *> multifabs(nMultiFabs);
+Tests/IOBenchmark/IOTest.cpp:    multifabs[nmf] = new MultiFab(bArray, dmap, ncomps, 0);
+Tests/IOBenchmark/IOTest.cpp:    for(MFIter mfiset(*(multifabs[nmf])); mfiset.isValid(); ++mfiset) {
+Tests/IOBenchmark/IOTest.cpp:          Real *dp = (*multifabs[nmf])[mfiset].dataPtr(invar);
+Tests/IOBenchmark/IOTest.cpp:	  for(int i(0); i < (*multifabs[nmf])[mfiset].box().numPts(); ++i) {
+Tests/IOBenchmark/IOTest.cpp:          (*multifabs[nmf])[mfiset].setVal((100.0 * mfiset.index()) + invar +
+Tests/IOBenchmark/IOTest.cpp:    totalBytesWritten += VisMF::Write(*multifabs[nmf], mfNames[nmf]);
+Tests/IOBenchmark/IOTest.cpp:    delete multifabs[nmf];
+Tests/IOBenchmark/IOTest.cpp:        cout << "VisMF::Check():  multifab is ok." << endl;
+Tests/IOBenchmark/IOTest.cpp:        cout << "**** Error:  VisMF::Check():  multifab is not ok." << endl;
+Tests/IOBenchmark/IOTest.cpp:  Vector<MultiFab *> multifabs(nMultiFabs);
+Tests/IOBenchmark/IOTest.cpp:    multifabs[nmf] = new MultiFab;
+Tests/IOBenchmark/IOTest.cpp:  VisMF::Read(*multifabs[0], mfNames[0], faHeaders[0].dataPtr(), 0); 
+Tests/IOBenchmark/IOTest.cpp:  const BoxArray& ba = multifabs[0]->boxArray();
+Tests/IOBenchmark/IOTest.cpp:  const DistributionMapping& dm = multifabs[0]->DistributionMap();
+Tests/IOBenchmark/IOTest.cpp:  const int ncomps = multifabs[0]->nComp();
+Tests/IOBenchmark/IOTest.cpp:  const int ng = multifabs[0]->nGrow();
+Tests/IOBenchmark/IOTest.cpp:      multifabs[nmf]->define(ba,dm,ncomps,ng);
+Tests/IOBenchmark/IOTest.cpp:      VisMF::Read(*multifabs[nmf], mfNames[nmf], faHeaders[nmf].dataPtr(), nmf); 
+Tests/IOBenchmark/IOTest.cpp:    for(int i(0); i < multifabs[nmf]->nComp(); ++i) {
+Tests/IOBenchmark/IOTest.cpp:      Real mfMin = multifabs[nmf]->min(i);
+Tests/IOBenchmark/IOTest.cpp:      Real mfMax = multifabs[nmf]->max(i);
+Tests/IOBenchmark/IOTest.cpp:    for(MFIter mfi(*multifabs[nmf]); mfi.isValid(); ++mfi) {
+Tests/IOBenchmark/IOTest.cpp:      totalNBytes += (*multifabs[nmf])[mfi].nBytes();
+Tests/IOBenchmark/IOTest.cpp:    delete multifabs[nmf];
+Tests/IOBenchmark/IOTestDriver.cpp:    cout << "   [nmultifabs        = nmf      ]" << '\n';
+Tests/IOBenchmark/IOTestDriver.cpp:  pp.query("nmultifabs", nMultiFabs);
+Tests/IOBenchmark/IOTestDriver.cpp:    cout << "nmultifabs        = " << nMultiFabs << '\n';
+Tests/Slice/main.cpp:    // default cell-centered multifab //
+Tests/Slice/main.cpp:    // node-based multifab //
+Tests/Slice/main.cpp:// This function generates 1D,2D, or 3D multifab that .lo and .hi contained        //
+Tests/Slice/main.cpp:// 1. Slice multifab (smf) is generated with same cell size as the parent domain   //
+Tests/Slice/main.cpp://    multifab (cs_mf) is coarsened and the data is averaged refined->coarse       //
+Tests/Slice/main.cpp:                amrex::Abort( " SLICEERROR :: cell size of slice is not an integer                                           multiple of the computaitonal domain's cell size" );
+Tests/Slice/main.cpp:                   amrex::Abort("SLICE_ERROR :: Max grid size of slice is not an                                              integer multiple of coarsening ratio ");
+Tests/Slice/main.cpp:    // Convert from cc to index type of parent multifab //
+Tests/Slice/main.cpp:    // multifab for slice  
+Tests/Slice/main.cpp:// assuming 6 components for all multifabs just for testing purposes //
+Tests/SliceWithInterp/main.cpp:    // default cell-centered multifab //
+Tests/SliceWithInterp/main.cpp:    // node-based multifab //
+Tests/SliceWithInterp/main.cpp:// This function generates 1D,2D, or 3D multifab that .lo and .hi contained        //
+Tests/SliceWithInterp/main.cpp:// 1. Slice multifab (smf) is generated with same cell size as the parent domain   //
+Tests/SliceWithInterp/main.cpp://    multifab (cs_mf) is coarsened and the data is averaged refined->coarse       //
+Tests/SliceWithInterp/main.cpp:    // Obtain index type of source multifab //
+Tests/SliceWithInterp/main.cpp:    // Convert from cc to index type of parent multifab //
+Tests/SliceWithInterp/main.cpp:    // multifab for slice  
+Tests/SliceWithInterp/main.cpp:              // If refined cells is not an integer multiple of coarsening ratio,                            then reduce coarsening ratio by factor of 2 // 
+Tests/ProfTests/HeatEquation_EX1_C/Source/main.cpp:    // we allocate two phi multifabs; one will store the old state, the other the new.
+Tests/ProfTests/HeatEquation_EX1_C/Source/main.cpp:    // build the flux multifabs
+Tests/ProfTests/ThirdParty/Source/main.cpp:    // we allocate two phi multifabs; one will store the old state, the other the new.
+Tests/ProfTests/ThirdParty/Source/main.cpp:    // build the flux multifabs
+Tests/PnetCDFBenchmark/WritePlotfilePnetCDF.cpp: * to the variable to accomodate multiple values per cell.
+Tools/C_util/Statistics/ComputeAmrDataStat.cpp:	  vwFab.mult(refMult[iLevel]);
+Tools/C_util/Statistics/ComputeAmrDataStat.cpp:	  vwFabSqrd.mult(fab,0,0,nComp);
+Tools/C_util/Statistics/ComputeAmrDataStat.cpp:	  vwFabSqrd.mult(refMult[iLevel]);
+Tools/C_util/Statistics/ComputeAmrDataStat.cpp:	  vwFabSqrd.mult(fab,0,0,nComp);
+Tools/C_util/Statistics/ComputeAmrDataStat.cpp:	  vwFab.mult(refMult[iLevel]);
+Tools/C_util/Statistics/ComputeAmrDataStat.cpp:	  vwFabSqrd.mult(fab,0,0,nComp);
+Tools/C_util/Statistics/ComputeAmrDataStat.cpp:	  vwFabSqrd.mult(refMult[iLevel]);
+Tools/C_util/Statistics/ComputeAmrDataStat.cpp:// Determine the mean and variance of a multifab.
+Tools/C_util/Statistics/ComputeAmrDataStat.cpp:      vwFabSqrd.mult(fab,0,0,nComp);
+Tools/C_util/Statistics/ComputeAmrDataStat.cpp:// Cross correlation is done with respect to a multifab.
+Tools/C_util/Statistics/ComputeAmrDataStat.cpp:      tmpc[mfi].mult(-1.0);
+Tools/C_util/Statistics/PltFileList.cpp:	  tmpvar[idx].mult(tmpvar[idx]);
+Tools/C_util/Statistics/PltFileList.cpp:	  tmpvar[idx].mult(tmpvar[idx]);
+Tools/C_util/Statistics/PltFileList.cpp:    mean.mult(nmaxinv);
+Tools/C_util/Statistics/PltFileList.cpp:      tmpmean[idx].mult(tmpmean[idx]);
+Tools/C_util/Statistics/PltFileList.cpp:    tmpmean.mult(double(nmax));
+Tools/C_util/Statistics/PltFileList.cpp:    variance.mult(nmaxinvm1);
+Tools/C_util/WritePlotFile.cpp:// Have to fake a level 0 data set, and then use incoming multifab as
+Tools/C_util/AugmentPlotfile/AugmentPlotfile.cpp:    // Make list of output multifabs
+Tools/C_util/ViewMF/mfMinMax.cpp://  Read multifab
+Tools/C_util/ViewMF/viewMFcol.cpp://  Read multifab
+Tools/C_util/ViewMF/viewMF.cpp://  Read multifab
+Tools/C_util/ViewMF/checkMFghostcells.cpp://  Read multifab
+Tools/C_util/ViewMF/MFNorm.cpp:    // Get a copy of the multifab
+Tools/C_util/ViewMF/main.cpp:      cerr << "Error in main:  multiple processors specified with "
+Tools/C_util/ViewMF/main.cpp:      cerr << "Error in main:  multiple processors specified with "
+Tools/C_util/ViewMF/main.cpp:      cerr << "Error in main:  multiple processors specified with "
+Tools/C_util/ViewMF/main.cpp:      cerr << "Error in main:  multiple processors specified with "
+Tools/C_util/ViewMF/main.cpp:    // Get a copy of the multifab, zero covered locations
+Tools/C_util/AppendToPlotFile.cpp:            // account for multiple multifabs 
+Tools/C_util/AppendToPlotFile.cpp:        // Write the new multifab
+Tools/C_util/Convergence/ComputeAmrDataNorms.cpp:		vwFab.mult(refMult[iLevel]);
+Tools/C_util/Convergence/ComputeAmrDataNorms.cpp:		vwFabSqrd.mult(fab,0,0,nComp);
+Tools/C_util/Convergence/ComputeAmrDataNorms.cpp:		vwFabSqrd.mult(refMult[iLevel]);
+Tools/C_util/Convergence/DebugOut.cpp:  amrex::Print() << "max min for multifab "  <<endl;
+Tools/C_util/Convergence/DebugOut.cpp:  amrex::Print() << "data for multifab "  <<endl;
+Tools/C_util/Convergence/DebugOut.cpp:  amrex::Print() << "data for multifab "  <<endl;
+Tools/C_util/DiffMultiFab/diffmultifab.cpp:        	Abort("The two multifabs have different BoxArray");
+Tools/Postprocessing/C_Src/HorizontalAvg.cpp:                        fab.mult(fab,localWtComp,n,1);
+Tools/Postprocessing/C_Src/HorizontalAvg.cpp:                fab.mult(mask,0,n,1);
+Tools/Plotfile/fcompare.cpp:    // create a multifab to store the difference for output, if desired
+Tools/Plotfile/fextract.cpp:            << "                                         multiple variables)\n"
+Tutorials/Amr/Advection_AmrCore/Source/AmrCoreAdv.cpp://             - sizes multilevel arrays and data structures
+Tutorials/Amr/Advection_AmrCore/Source/AmrCoreAdv.cpp:// initializes multilevel data
+Tutorials/Amr/Advection_AmrCore/Source/AmrCoreAdv.cpp:// more flexible version of AverageDown() that lets you average down across multiple levels
+Tutorials/Amr/Advection_AmrCore/Source/AmrCoreAdv.cpp:// compute a new multifab by coping in phi from valid region and filling ghost cells
+Tutorials/Amr/Advection_AmrCore/Source/AmrCoreAdv.cpp:// fill an entire multifab by interpolating from the coarser level
+Tutorials/Amr/Advection_AmrCore/Source/AmrCoreAdv.cpp:// utility to copy in data from phi_old and/or phi_new into another multifab
+Tutorials/Amr/Advection_AmrCore/Source/AmrCoreAdv.cpp:// put together an array of multifabs for writing
+Tutorials/Amr/Advection_AmrCore/Source/main.cpp:        //             - sizes multilevel arrays and data structures
+Tutorials/GPU/Advection_AmrCore/Source/AmrCoreAdv.cpp://             - sizes multilevel arrays and data structures
+Tutorials/GPU/Advection_AmrCore/Source/AmrCoreAdv.cpp:// initializes multilevel data
+Tutorials/GPU/Advection_AmrCore/Source/AmrCoreAdv.cpp:// more flexible version of AverageDown() that lets you average down across multiple levels
+Tutorials/GPU/Advection_AmrCore/Source/AmrCoreAdv.cpp:// compute a new multifab by coping in phi from valid region and filling ghost cells
+Tutorials/GPU/Advection_AmrCore/Source/AmrCoreAdv.cpp:// fill an entire multifab by interpolating from the coarser level
+Tutorials/GPU/Advection_AmrCore/Source/AmrCoreAdv.cpp:// utility to copy in data from phi_old and/or phi_new into another multifab
+Tutorials/GPU/Advection_AmrCore/Source/AmrCoreAdv.cpp:    // Build temporary multiFabs to work on.
+Tutorials/GPU/Advection_AmrCore/Source/AmrCoreAdv.cpp:// put together an array of multifabs for writing
+Tutorials/GPU/Advection_AmrCore/Source/main.cpp:        //             - sizes multilevel arrays and data structures
+Tutorials/GPU/HeatEquation_EX1_C/Source/main.cpp:    // we allocate two phi multifabs; one will store the old state, the other the new.
+Tutorials/GPU/HeatEquation_EX1_C/Source/main.cpp:    // build the flux multifabs
+Tutorials/GPU/EBCNS/Source/CNS_io.cpp:    // We combine all of the multifabs -- state, derived, etc -- into one
+Tutorials/GPU/EBCNS/Source/CNS_io.cpp:    // multifab -- plotMF.
+Tutorials/GPU/EBCNS/Source/CNS_io.cpp:    // but a derived variable is allowed to have multiple components.
+Tutorials/CVODE/SUNDIALS4/EX-CUSOLVER/main.cpp:    // we allocate our main multifabs
+Tutorials/EB/CNS/Source/CNS_io.cpp:    // We combine all of the multifabs -- state, derived, etc -- into one
+Tutorials/EB/CNS/Source/CNS_io.cpp:    // multifab -- plotMF.
+Tutorials/EB/CNS/Source/CNS_io.cpp:    // but a derived variable is allowed to have multiple components.
+Tutorials/EB/Poisson/main.cpp:        // scaling factors; these multiply ACoef and BCoef
+Tutorials/Basic/HeatEquation_EX3_C/Source/main.cpp:    // we allocate two phi multifabs; one will store the old state, the other the new.
+Tutorials/Basic/HeatEquation_EX1_C/Source/main.cpp:    // we allocate two phi multifabs; one will store the old state, the other the new.
+Tutorials/Basic/HeatEquation_EX1_C/Source/main.cpp:    // build the flux multifabs
+Tutorials/Basic/main_C/main.cpp://     multiple `parm=value`s.
+Tutorials/Basic/HeatEquation_EX2_C/Source/main.cpp:    // we allocate two phi multifabs; one will store the old state, the other the new.
+Tutorials/Basic/HeatEquation_EX2_C/Source/main.cpp:    // build the flux multifabs
+Tutorials/Particles/ElectrostaticPIC/ElectrostaticParticleContainer.cpp:        rho[lev]->mult(-1.0/PhysConst::ep0, ng);
+Tutorials/ForkJoin/MLMG/main.cpp:    // these multifabs go to task 0 only
+Tutorials/ForkJoin/MLMG/main.cpp:    // register how to copy multifabs to/from tasks
+Tutorials/ForkJoin/MLMG/main.cpp:    // can reuse ForkJoin object for multiple fork-join invocations
+Tutorials/ForkJoin/MLMG/main.cpp:    // creates forked multifabs only first time around, reuses them thereafter
+Tutorials/SENSEI/Advection_AmrCore/Source/AmrCoreAdv.cpp://             - sizes multilevel arrays and data structures
+Tutorials/SENSEI/Advection_AmrCore/Source/AmrCoreAdv.cpp:// initializes multilevel data
+Tutorials/SENSEI/Advection_AmrCore/Source/AmrCoreAdv.cpp:// more flexible version of AverageDown() that lets you average down across multiple levels
+Tutorials/SENSEI/Advection_AmrCore/Source/AmrCoreAdv.cpp:// compute a new multifab by coping in phi from valid region and filling ghost cells
+Tutorials/SENSEI/Advection_AmrCore/Source/AmrCoreAdv.cpp:// fill an entire multifab by interpolating from the coarser level
+Tutorials/SENSEI/Advection_AmrCore/Source/AmrCoreAdv.cpp:// utility to copy in data from phi_old and/or phi_new into another multifab
+Tutorials/SENSEI/Advection_AmrCore/Source/AmrCoreAdv.cpp:// put together an array of multifabs for writing
+Tutorials/SENSEI/Advection_AmrCore/Source/main.cpp:        //             - sizes multilevel arrays and data structures
+Tutorials/MUI/Source_02/main_02.cpp:    // because multiple 3D grids contain the same (x,y) coordinates, where (x,y,z) is unique
+Tutorials/MUI/Source_02/main_02.cpp:    // Modify 2D phi: in this case, multiply by a constant
+Tutorials/MUI/Source_02/main_02.cpp:    phi.mult(2.0);
+Tutorials/MUI/Source_01/main_01.cpp:    // because multiple 3D grids contain the same (x,y) coordinates, where (x,y,z) is unique
+Tutorials/SDC/MISDC_ADR_2d/Source/SDC_sweeper.cpp:  /*  This is a multi-implicit SDC example time step for an 
+Tutorials/SDC/MISDC_ADR_2d/Source/SDC_sweeper.cpp:      //  Do the multigrid solve
+Tutorials/SDC/MISDC_ADR_2d/Source/main.cpp:    // We allocate two phi multifabs; one will store the old state, the other the new.
+Tutorials/SDC/MISDC_ADR_2d/Source/main.cpp:    // Build the flux multifabs
+Tutorials/Blueprint/HeatEquation_EX1_C/Source/main.cpp:    // we allocate two phi multifabs; one will store the old state, the other the new.
+Tutorials/Blueprint/HeatEquation_EX1_C/Source/main.cpp:    // build the flux multifabs

@@ -1,0 +1,488 @@
+module compute_flux_module
+
+  use amr_data_module
+  use my_amr_module
+  use compute_semilagrangian_flux
+  use compgeom_lookup
+  use irl_fortran_interface
+
+  implicit none
+
+  private
+
+  public :: compute_flux_3d
+
+contains
+
+  subroutine compute_flux_3d(lo, hi, dt, dx,     &
+                             phi,ph_lo,ph_hi,    &
+                             umac,  u_lo,  u_hi, &
+                             vmac,  v_lo,  v_hi, &
+                             wmac,  w_lo,  w_hi, &
+                             flxx, fx_lo, fx_hi, &
+                             flxy, fy_lo, fy_hi, &
+                             flxz, fz_lo, fz_hi, &
+			     volx, voly, volz, &
+			     gradxphi_mat,gradyphi_mat,gradzphi_mat,&
+			     plocalizer,pseparator,plocseplink,&
+			     x,y,z,xm,ym,zm)
+
+    integer, intent(in) :: lo(3), hi(3)
+    double precision, intent(in) :: dt, dx(3)
+    integer, intent(in) :: ph_lo(3), ph_hi(3)
+    integer, intent(in) ::  u_lo(3),  u_hi(3)
+    integer, intent(in) ::  v_lo(3),  v_hi(3)
+    integer, intent(in) ::  w_lo(3),  w_hi(3)
+    integer, intent(in) :: fx_lo(3), fx_hi(3)
+    integer, intent(in) :: fy_lo(3), fy_hi(3)
+    integer, intent(in) :: fz_lo(3), fz_hi(3)
+    double precision, intent(in   ) :: phi (ph_lo(1):ph_hi(1),ph_lo(2):ph_hi(2),ph_lo(3):ph_hi(3),ncomp)
+    double precision, intent(in   ) :: umac( u_lo(1): u_hi(1), u_lo(2): u_hi(2), u_lo(3): u_hi(3))
+    double precision, intent(in   ) :: vmac( v_lo(1): v_hi(1), v_lo(2): v_hi(2), v_lo(3): v_hi(3))
+    double precision, intent(in   ) :: wmac( w_lo(1): w_hi(1), w_lo(2): w_hi(2), w_lo(3): w_hi(3))
+    double precision, intent(  out) :: flxx(fx_lo(1):fx_hi(1),fx_lo(2):fx_hi(2),fx_lo(3):fx_hi(3),ncomp)
+    double precision, intent(  out) :: flxy(fy_lo(1):fy_hi(1),fy_lo(2):fy_hi(2),fy_lo(3):fy_hi(3),ncomp)
+    double precision, intent(  out) :: flxz(fz_lo(1):fz_hi(1),fz_lo(2):fz_hi(2),fz_lo(3):fz_hi(3),ncomp)
+    double precision, intent(out)  :: volx(lo(1):hi(1)+1,lo(2):hi(2),lo(3):hi(3))
+    double precision, intent(out)  :: voly(lo(1):hi(1),lo(2):hi(2)+1,lo(3):hi(3))
+    double precision, intent(out)  :: volz(lo(1):hi(1),lo(2):hi(2),lo(3):hi(3)+1)
+    double precision, intent(in   ) :: gradxphi_mat (ph_lo(1):ph_hi(1),ph_lo(2):ph_hi(2),ph_lo(3):ph_hi(3),ncomp)
+    double precision, intent(in   ) :: gradyphi_mat (ph_lo(1):ph_hi(1),ph_lo(2):ph_hi(2),ph_lo(3):ph_hi(3),ncomp)
+    double precision, intent(in   ) :: gradzphi_mat (ph_lo(1):ph_hi(1),ph_lo(2):ph_hi(2),ph_lo(3):ph_hi(3),ncomp)
+    double precision, intent(in) :: x(lo(1)-1:hi(1)+2)
+    double precision, intent(in) :: y(lo(2)-1:hi(2)+2)
+    double precision, intent(in) :: z(lo(3)-1:hi(3)+2)
+    double precision, intent(in) :: xm(lo(1)-1:hi(1)+1)
+    double precision, intent(in) :: ym(lo(2)-1:hi(2)+1)
+    double precision, intent(in) :: zm(lo(3)-1:hi(3)+1)   
+
+    type(planarlocalizer_type), intent(in)        :: plocalizer(ph_lo(1):ph_hi(1),ph_lo(2):ph_hi(2),ph_lo(3):ph_hi(3))
+    type(planarseparator_type), intent(in)        :: pseparator(ph_lo(1):ph_hi(1),ph_lo(2):ph_hi(2),ph_lo(3):ph_hi(3))
+    type(localizedseparatorlink_type), intent(inout) :: plocseplink(ph_lo(1):ph_hi(1),ph_lo(2):ph_hi(2),ph_lo(3):ph_hi(3))
+
+    double precision, dimension(3,4) :: tet
+    integer,  dimension(3,4) :: ind
+    integer :: n
+    double precision, dimension(11) :: flux
+    double precision :: volume
+
+    integer :: i, j, k, icomp, ipt
+    double precision, dimension(3,8) :: original_cell, projected_cell, transported_cell
+
+    flux=0.0d0
+
+  ! Allocate flux_hexahedron in IRL
+
+   call flux_hexahedron(1)%new()
+
+    do       k = lo(3), hi(3)
+       do    j = lo(2), hi(2)
+          do i = lo(1), hi(1)
+	 
+	  ! Cell nodal points
+	  original_cell(:,1)=[x(i),y(j),    z(k)  ] ;original_cell(:,2)=[x(i+1),y(j),    z(k)];
+	  original_cell(:,3)=[x(i+1),y(j),z(k+1) ]  ;original_cell(:,4)=[x(i),y(j),    z(k+1)];
+	  original_cell(:,5)=[x(i),y(j+1),  z(k)  ] ;original_cell(:,6)=[x(i+1),y(j+1),  z(k)];
+	  original_cell(:,7)=[x(i+1),y(j+1), z(k+1)];original_cell(:,8)=[x(i),y(j+1),  z(k+1)];
+	 
+    	  ! Project all the cell nodal points just once
+	  do ipt=1,8 
+          projected_cell(:,ipt) =project(original_cell(:,ipt),-dt,i,j,k,umac,u_lo,u_hi,vmac,v_lo,v_hi,wmac,w_lo,w_hi,lo,hi,x,y,z,xm,ym,zm)
+	  enddo
+         
+	  ! Compute x face flux 
+	  transported_cell(:,1)=original_cell(:,4);transported_cell(:,2)=original_cell(:,1)
+	  transported_cell(:,3)=original_cell(:,5);transported_cell(:,4)=original_cell(:,8)
+	  transported_cell(:,5)=projected_cell(:,4);transported_cell(:,6)=projected_cell(:,1)
+	  transported_cell(:,7)=projected_cell(:,5);transported_cell(:,8)=projected_cell(:,8)
+
+	  !call compute_flux(transported_cell,i,j,k,dx,ph_lo,ph_hi,phi,gradxphi_mat,gradyphi_mat,gradzphi_mat,&
+          !                                                lo,hi,x,y,z,xm,ym,zm,flux)
+
+
+          call compute_fluxes(i,j,k,transported_cell,plocseplink,lo,hi,x,y,z,xm,ym,zm,phi,gradxphi_mat,gradyphi_mat,gradzphi_mat,ph_lo,ph_hi,flux,volume)
+
+          ! compute final x-fluxes
+	   do icomp=1,ncomp	
+              flxx(i,j,k,icomp) = flux(icomp)
+	   enddo		 
+	   volx(i,j,k) = volume  
+
+	  ! Compute y face flux
+          transported_cell(:,1)=original_cell(:,2);transported_cell(:,2)=original_cell(:,1)
+          transported_cell(:,3)=original_cell(:,4);transported_cell(:,4)=original_cell(:,3)
+          transported_cell(:,5)=projected_cell(:,2);transported_cell(:,6)=projected_cell(:,1)
+          transported_cell(:,7)=projected_cell(:,4);transported_cell(:,8)=projected_cell(:,3)
+
+	  !call compute_flux(transported_cell,i,j,k,dx,ph_lo,ph_hi,phi,gradxphi_mat,gradyphi_mat,gradzphi_mat,&
+          !                                                lo,hi,x,y,z,xm,ym,zm,flux)
+
+
+          call compute_fluxes(i,j,k,transported_cell,plocseplink,lo,hi,x,y,z,xm,ym,zm,phi,gradxphi_mat,gradyphi_mat,gradzphi_mat,ph_lo,ph_hi,flux,volume)
+
+          ! compute final y-fluxes
+           do icomp=1,ncomp
+              flxy(i,j,k,icomp) = flux(icomp)
+           enddo
+	   voly(i,j,k) = volume
+
+	  ! Compute z face flux
+          transported_cell(:,1)=original_cell(:,5);transported_cell(:,2)=original_cell(:,1)
+          transported_cell(:,3)=original_cell(:,2);transported_cell(:,4)=original_cell(:,6)
+          transported_cell(:,5)=projected_cell(:,5);transported_cell(:,6)=projected_cell(:,1)
+          transported_cell(:,7)=projected_cell(:,2);transported_cell(:,8)=projected_cell(:,6)
+
+
+	  !call compute_flux(transported_cell,i,j,k,dx,ph_lo,ph_hi,phi,gradxphi_mat,gradyphi_mat,gradzphi_mat,&
+          !                                                lo,hi,x,y,z,xm,ym,zm,flux)
+
+	  !print*, "Printing i, j, k", i, j, k
+
+          call compute_fluxes(i,j,k,transported_cell,plocseplink,lo,hi,x,y,z,xm,ym,zm,phi,gradxphi_mat,gradyphi_mat,gradzphi_mat,ph_lo,ph_hi,flux,volume)
+
+          ! compute final z-fluxes
+           do icomp=1,ncomp
+              flxz(i,j,k,icomp) = flux(icomp)
+           enddo
+  	   volz(i,j,k) = volume
+
+          end do
+       end do
+    end do
+
+
+   ! Last x face
+
+    do  k = lo(3), hi(3)
+        do  j = lo(2), hi(2)
+          do i = hi(1)+1, hi(1)+1
+	 
+	  ! Cell nodal points
+	  original_cell(:,1)=[x(i),y(j),    z(k)  ] ;original_cell(:,2)=[x(i+1),y(j),    z(k)];
+	  original_cell(:,3)=[x(i+1),y(j),z(k+1) ]  ;original_cell(:,4)=[x(i),y(j),    z(k+1)];
+	  original_cell(:,5)=[x(i),y(j+1),  z(k)  ] ;original_cell(:,6)=[x(i+1),y(j+1),  z(k)];
+	  original_cell(:,7)=[x(i+1),y(j+1), z(k+1)];original_cell(:,8)=[x(i),y(j+1),  z(k+1)];
+	 
+    	  ! Project all the cell nodal points just once
+          projected_cell(:,1) =project(original_cell(:,1),-dt,i,j,k,umac,u_lo,u_hi,vmac,v_lo,v_hi,wmac,w_lo,w_hi,lo,hi,x,y,z,xm,ym,zm)
+          projected_cell(:,4) =project(original_cell(:,4),-dt,i,j,k,umac,u_lo,u_hi,vmac,v_lo,v_hi,wmac,w_lo,w_hi,lo,hi,x,y,z,xm,ym,zm)
+          projected_cell(:,8) =project(original_cell(:,8),-dt,i,j,k,umac,u_lo,u_hi,vmac,v_lo,v_hi,wmac,w_lo,w_hi,lo,hi,x,y,z,xm,ym,zm)
+          projected_cell(:,5) =project(original_cell(:,5),-dt,i,j,k,umac,u_lo,u_hi,vmac,v_lo,v_hi,wmac,w_lo,w_hi,lo,hi,x,y,z,xm,ym,zm)
+         
+	  ! Compute x face flux 
+	  transported_cell(:,1)=original_cell(:,4);transported_cell(:,2)=original_cell(:,1)
+	  transported_cell(:,3)=original_cell(:,5);transported_cell(:,4)=original_cell(:,8)
+	  transported_cell(:,5)=projected_cell(:,4);transported_cell(:,6)=projected_cell(:,1)
+	  transported_cell(:,7)=projected_cell(:,5);transported_cell(:,8)=projected_cell(:,8)
+
+	  !call compute_flux(transported_cell,i,j,k,dx,ph_lo,ph_hi,phi,gradxphi_mat,gradyphi_mat,gradzphi_mat,&
+          !                                                lo,hi,x,y,z,xm,ym,zm,flux)
+
+
+          call compute_fluxes(i,j,k,transported_cell,plocseplink,lo,hi,x,y,z,xm,ym,zm,phi,gradxphi_mat,gradyphi_mat,gradzphi_mat,ph_lo,ph_hi,flux,volume)
+
+          ! compute final x-fluxes
+	   do icomp=1,ncomp	
+              flxx(i,j,k,icomp) = flux(icomp)
+	   enddo		
+	   volx(i,j,k) = volume
+
+          end do
+       end do
+    end do
+
+   ! Last y face
+
+   do  k = lo(3), hi(3)
+       do  j = hi(2)+1, hi(2)+1
+          do i = lo(1), hi(1)
+	 
+	  ! Cell nodal points
+	  original_cell(:,1)=[x(i),y(j),    z(k)  ] ;original_cell(:,2)=[x(i+1),y(j),    z(k)];
+	  original_cell(:,3)=[x(i+1),y(j),z(k+1) ]  ;original_cell(:,4)=[x(i),y(j),    z(k+1)];
+	  original_cell(:,5)=[x(i),y(j+1),  z(k)  ] ;original_cell(:,6)=[x(i+1),y(j+1),  z(k)];
+	  original_cell(:,7)=[x(i+1),y(j+1), z(k+1)];original_cell(:,8)=[x(i),y(j+1),  z(k+1)];
+	 
+    	  ! Project all the cell nodal points just once
+          projected_cell(:,1) =project(original_cell(:,1),-dt,i,j,k,umac,u_lo,u_hi,vmac,v_lo,v_hi,wmac,w_lo,w_hi,lo,hi,x,y,z,xm,ym,zm)
+          projected_cell(:,2) =project(original_cell(:,2),-dt,i,j,k,umac,u_lo,u_hi,vmac,v_lo,v_hi,wmac,w_lo,w_hi,lo,hi,x,y,z,xm,ym,zm)
+          projected_cell(:,3) =project(original_cell(:,3),-dt,i,j,k,umac,u_lo,u_hi,vmac,v_lo,v_hi,wmac,w_lo,w_hi,lo,hi,x,y,z,xm,ym,zm)
+          projected_cell(:,4) =project(original_cell(:,4),-dt,i,j,k,umac,u_lo,u_hi,vmac,v_lo,v_hi,wmac,w_lo,w_hi,lo,hi,x,y,z,xm,ym,zm)
+
+	  ! Compute y face flux
+          transported_cell(:,1)=original_cell(:,2);transported_cell(:,2)=original_cell(:,1)
+          transported_cell(:,3)=original_cell(:,4);transported_cell(:,4)=original_cell(:,3)
+          transported_cell(:,5)=projected_cell(:,2);transported_cell(:,6)=projected_cell(:,1)
+          transported_cell(:,7)=projected_cell(:,4);transported_cell(:,8)=projected_cell(:,3)
+
+	  !call compute_flux(transported_cell,i,j,k,dx,ph_lo,ph_hi,phi,gradxphi_mat,gradyphi_mat,gradzphi_mat,&
+          !                                                lo,hi,x,y,z,xm,ym,zm,flux)
+
+          call compute_fluxes(i,j,k,transported_cell,plocseplink,lo,hi,x,y,z,xm,ym,zm,phi,gradxphi_mat,gradyphi_mat,gradzphi_mat,ph_lo,ph_hi,flux,volume)
+
+          ! compute final y-fluxes
+           do icomp=1,ncomp
+              flxy(i,j,k,icomp) = flux(icomp)
+           enddo
+	   voly(i,j,k) = volume
+
+          end do
+       end do
+    end do
+
+   ! Last z face
+
+    do  k = hi(3)+1, hi(3)+1
+       do    j = lo(2), hi(2)
+          do i = lo(1), hi(1)
+	 
+	  ! Cell nodal points
+	  original_cell(:,1)=[x(i),y(j),    z(k)  ] ;original_cell(:,2)=[x(i+1),y(j),    z(k)];
+	  original_cell(:,3)=[x(i+1),y(j),z(k+1) ]  ;original_cell(:,4)=[x(i),y(j),    z(k+1)];
+	  original_cell(:,5)=[x(i),y(j+1),  z(k)  ] ;original_cell(:,6)=[x(i+1),y(j+1),  z(k)];
+	  original_cell(:,7)=[x(i+1),y(j+1), z(k+1)];original_cell(:,8)=[x(i),y(j+1),  z(k+1)];
+	 
+    	  ! Project all the cell nodal points just once
+          projected_cell(:,1) =project(original_cell(:,1),-dt,i,j,k,umac,u_lo,u_hi,vmac,v_lo,v_hi,wmac,w_lo,w_hi,lo,hi,x,y,z,xm,ym,zm)
+          projected_cell(:,5) =project(original_cell(:,5),-dt,i,j,k,umac,u_lo,u_hi,vmac,v_lo,v_hi,wmac,w_lo,w_hi,lo,hi,x,y,z,xm,ym,zm)
+          projected_cell(:,6) =project(original_cell(:,6),-dt,i,j,k,umac,u_lo,u_hi,vmac,v_lo,v_hi,wmac,w_lo,w_hi,lo,hi,x,y,z,xm,ym,zm)
+          projected_cell(:,2) =project(original_cell(:,2),-dt,i,j,k,umac,u_lo,u_hi,vmac,v_lo,v_hi,wmac,w_lo,w_hi,lo,hi,x,y,z,xm,ym,zm)
+         
+	  ! Compute z face flux
+          transported_cell(:,1)=original_cell(:,5);transported_cell(:,2)=original_cell(:,1)
+          transported_cell(:,3)=original_cell(:,2);transported_cell(:,4)=original_cell(:,6)
+          transported_cell(:,5)=projected_cell(:,5);transported_cell(:,6)=projected_cell(:,1)
+          transported_cell(:,7)=projected_cell(:,2);transported_cell(:,8)=projected_cell(:,6)
+
+	  !call compute_flux(transported_cell,i,j,k,dx,ph_lo,ph_hi,phi,gradxphi_mat,gradyphi_mat,gradzphi_mat,&
+          !                                                lo,hi,x,y,z,xm,ym,zm,flux)
+
+	  !print*, "Calling last face"
+
+          call compute_fluxes(i,j,k,transported_cell,plocseplink,lo,hi,x,y,z,xm,ym,zm,phi,gradxphi_mat,gradyphi_mat,gradzphi_mat,ph_lo,ph_hi,flux,volume)
+
+          ! compute final z-fluxes
+           do icomp=1,ncomp
+              flxz(i,j,k,icomp) = flux(icomp)
+           enddo
+	   volz(i,j,k) = volume
+
+          end do
+       end do
+    end do
+
+  end subroutine compute_flux_3d
+
+  subroutine compute_flux(transported_cell,i,j,k,dx,ph_lo,ph_hi,phi,gradxphi_mat,gradyphi_mat,gradzphi_mat,&
+                                                          lo,hi,x,y,z,xm,ym,zm,flux)
+
+    implicit none
+  
+    double precision, dimension(3,8), intent(in) :: transported_cell
+    integer, intent(in) :: i,j,k
+    double precision, intent(in) :: dx(3)
+    integer, intent(in) :: ph_lo(3), ph_hi(3)
+    double precision, intent(in   ) :: phi (ph_lo(1):ph_hi(1),ph_lo(2):ph_hi(2),ph_lo(3):ph_hi(3),ncomp)
+    double precision, intent(in   ) :: gradxphi_mat (ph_lo(1):ph_hi(1),ph_lo(2):ph_hi(2),ph_lo(3):ph_hi(3),ncomp)
+    double precision, intent(in   ) :: gradyphi_mat (ph_lo(1):ph_hi(1),ph_lo(2):ph_hi(2),ph_lo(3):ph_hi(3),ncomp)
+    double precision, intent(in   ) :: gradzphi_mat (ph_lo(1):ph_hi(1),ph_lo(2):ph_hi(2),ph_lo(3):ph_hi(3),ncomp)
+    integer, intent(in) :: lo(3), hi(3)
+    double precision, intent(in) :: x(lo(1)-1:hi(1)+2)
+    double precision, intent(in) :: y(lo(2)-1:hi(2)+2)
+    double precision, intent(in) :: z(lo(3)-1:hi(3)+2)
+    double precision, intent(in) :: xm(lo(1)-1:hi(1)+1)
+    double precision, intent(in) :: ym(lo(2)-1:hi(2)+1)
+    double precision, intent(in) :: zm(lo(3)-1:hi(3)+1)
+    double precision, dimension(3,4) :: tet
+    integer,  dimension(3,4) :: ind
+    integer :: n
+    double precision, dimension(13),intent(out) :: flux
+
+    ! Advect the face
+           flux=0.0d0
+           do n=1,6
+          ! Build tet and corresponding indices
+
+              tet(:,1)=transported_cell(:,tet_map2(1,n)); ind(:,1)=get_indices(tet(:,1),[i,j,k],lo,hi,x,y,z)
+              tet(:,2)=transported_cell(:,tet_map2(2,n)); ind(:,2)=get_indices(tet(:,2),[i,j,k],lo,hi,x,y,z)
+              tet(:,3)=transported_cell(:,tet_map2(3,n)); ind(:,3)=get_indices(tet(:,3),[i,j,k],lo,hi,x,y,z)
+              tet(:,4)=transported_cell(:,tet_map2(4,n)); ind(:,4)=get_indices(tet(:,4),[i,j,k],lo,hi,x,y,z)
+
+              ! Add corresponding flux
+              flux=flux+tet_sign(tet)*tet2flux(tet,ind,dx,ph_lo,ph_hi,phi,&
+                                                          gradxphi_mat,gradyphi_mat,gradzphi_mat,&
+                                                          lo,hi,x,y,z,xm,ym,zm)
+           end do
+
+ end subroutine compute_flux 
+
+
+subroutine setUpMeshConnectivity(lower_ind, upper_ind, ph_lo, ph_hi, plocseplink)
+  use irl_fortran_interface
+  implicit none
+  integer, intent(in) :: ph_lo(3), ph_hi(3)
+  integer, dimension(1:3), intent(in) :: lower_ind
+  integer, dimension(1:3), intent(in) :: upper_ind
+  type(localizedseparatorlink_type), dimension(ph_lo(1):ph_hi(1),ph_lo(2):ph_hi(2),ph_lo(3):ph_hi(3)),intent(inout) :: plocseplink
+
+  integer :: i,j,k
+  integer :: unique_id
+
+  ! Connect all the mesh
+  unique_id = 1
+ do k = lower_ind(3), upper_ind(3)
+    do j = lower_ind(2), upper_ind(2)
+       do i = lower_ind(1), upper_ind(1)
+
+      ! Set unique ID
+      call plocseplink(i,j,k)%setUniqueId(unique_id)
+
+      if(i-1 .lt. lower_ind(1)) then
+        call plocseplink(i,j,k)%setConnectivityNull(1)
+	!print*, "here11"
+      else
+        call plocseplink(i,j,k)%setConnectivity(1,plocseplink(i-1,j,k))
+	!print*, "here12"
+      end if
+
+      if(i+1 .gt. upper_ind(1)) then
+        call plocseplink(i,j,k)%setConnectivityNull(2)
+	!print*, "here21"
+      else
+        call plocseplink(i,j,k)%setConnectivity(2,plocseplink(i+1,j,k))
+	!print*, "here22"
+      end if
+
+      if(j-1 .lt. lower_ind(2)) then
+        call plocseplink(i,j,k)%setConnectivityNull(3)
+	!print*, "here31"
+      else
+        call plocseplink(i,j,k)%setConnectivity(3,plocseplink(i,j-1,k))
+	!print*, "here32"
+      end if
+
+      if(j+1 .gt. upper_ind(2)) then
+        call plocseplink(i,j,k)%setConnectivityNull(4)
+	!print*, "here41"
+      else
+        call plocseplink(i,j,k)%setConnectivity(4,plocseplink(i,j+1,k))
+	!print*, "here42"
+      end if
+
+      if(k-1 .lt. lower_ind(3)) then
+        call plocseplink(i,j,k)%setConnectivityNull(5)
+	!print*, "here51"
+      else
+        call plocseplink(i,j,k)%setConnectivity(5,plocseplink(i,j,k-1))
+	!print*, "here52"
+      end if
+
+      if(k+1 .gt. upper_ind(3)) then
+        call plocseplink(i,j,k)%setConnectivityNull(6)
+	!print*, "here61"
+      else
+        call plocseplink(i,j,k)%setConnectivity(6,plocseplink(i,j,k+1))
+	!print*, "here62"
+      end if
+
+      unique_id = unique_id + 1
+
+      end do
+    end do
+  end do
+
+ end subroutine setUpMeshConnectivity
+
+subroutine compute_fluxes(i,j,k,transported_cell,plocseplink,lo,hi,x,y,z,xm,ym,zm,phi,gradxphi_mat,gradyphi_mat,gradzphi_mat,ph_lo,ph_hi,flux,volume)
+
+ use amr_data_module
+ use irl_fortran_interface
+ implicit none
+
+ integer, intent(in) :: i,j,k,ph_lo(3),ph_hi(3),lo(3),hi(3)
+ double precision, dimension(3,8), intent(in) :: transported_cell 
+ type(localizedseparatorlink_type), intent(inout) :: plocseplink(ph_lo(1):ph_hi(1),ph_lo(2):ph_hi(2),ph_lo(3):ph_hi(3))
+ double precision, intent(in) :: x(lo(1)-1:hi(1)+2)
+ double precision, intent(in) :: y(lo(2)-1:hi(2)+2)
+ double precision, intent(in) :: z(lo(3)-1:hi(3)+2)
+ double precision, intent(in) :: xm(lo(1)-1:hi(1)+1)
+ double precision, intent(in) :: ym(lo(2)-1:hi(2)+1)
+ double precision, intent(in) :: zm(lo(3)-1:hi(3)+1)
+ double precision, intent(in   ) :: phi (ph_lo(1):ph_hi(1),ph_lo(2):ph_hi(2),ph_lo(3):ph_hi(3),ncomp)
+ double precision, intent(in   ) :: gradxphi_mat (ph_lo(1):ph_hi(1),ph_lo(2):ph_hi(2),ph_lo(3):ph_hi(3),ncomp)
+ double precision, intent(in   ) :: gradyphi_mat (ph_lo(1):ph_hi(1),ph_lo(2):ph_hi(2),ph_lo(3):ph_hi(3),ncomp)
+ double precision, intent(in   ) :: gradzphi_mat (ph_lo(1):ph_hi(1),ph_lo(2):ph_hi(2),ph_lo(3):ph_hi(3),ncomp)
+ double precision, dimension(1:3) :: lower_point, upper_point
+ integer,  dimension(3) :: lower_ind, upper_ind
+ type(accumvm_sepvm_type) :: flux_irl
+ double precision :: phi_reconstruct(ncomp)
+ integer :: id
+ integer :: ii,jj,kk,nlocalizers,icomp
+ double precision, intent(out) :: flux(11)
+ double precision, intent(out) :: volume
+ double precision :: dx, dy, dz
+ double precision :: centroid(3),centroid1(3),centroid2(3)
+   
+
+  dx=x(lo(1))-x(lo(1)-1)
+  dy=y(lo(2))-y(lo(2)-1)
+  dz=z(lo(3))-z(lo(3)-1)
+ call Constants_setMinimumVolumeToTrack(dx*dy*dz*1.0d-15)
+
+ call flux_hexahedron(1)%construct((/transported_cell(:,1),&
+                                     transported_cell(:,2),&
+                                     transported_cell(:,3),&
+                                     transported_cell(:,4),&
+                                     transported_cell(:,5),&
+                                     transported_cell(:,6),&
+                                     transported_cell(:,7),&
+                                     transported_cell(:,8)/))
+
+  ! Now perform actual cutting
+  call flux_hexahedron(1)%getBoundingPts(lower_point, upper_point)
+  lower_ind = get_indices(lower_point,(/i,j,k/),lo,hi,x,y,z)
+  upper_ind = get_indices(upper_point,(/i,j,k/),lo,hi,x,y,z)
+  nlocalizers=(upper_ind(1)-lower_ind(1)+1)*(upper_ind(2)-lower_ind(2)+1)*(upper_ind(3)-lower_ind(3)+1)
+  call setUpMeshConnectivity(lower_ind, upper_ind,ph_lo,ph_hi,plocseplink)
+  call flux_irl%new()
+  call signedGenericCutting(flux_hexahedron(1),plocseplink(lower_ind(1),lower_ind(2),lower_ind(3)),flux_irl)
+
+
+  flux=0.0d0
+  volume=0.0d0
+  do kk=lower_ind(3),upper_ind(3)
+     do jj=lower_ind(2),upper_ind(2)
+        do ii=lower_ind(1),upper_ind(1)
+           id=plocseplink(ii,jj,kk)%getUniqueId()
+
+	   if(id .gt. flux_irl%getSize())cycle
+
+          !centroid1=flux_irl%getCentroid(id,1)
+          !centroid2=flux_irl%getCentroid(id,2)
+		  !centroid=(centroid1*abs(flux_irl%getVolume(id,1))+centroid2*abs(flux_irl%getVolume(id,2)))/(abs(flux_irl%getVolume(id,1))+abs(flux_irl%getVolume(id,2))+1d-10)
+           do icomp=1,ncomp-1
+	      phi_reconstruct(icomp)=phi(ii,jj,kk,icomp)!+gradxphi_mat(ii,jj,kk,icomp)*(centroid(1)-xm(ii))+&
+                                                         !gradyphi_mat(ii,jj,kk,icomp)*(centroid(2)-ym(jj))+&
+                                                         !gradzphi_mat(ii,jj,kk,icomp)*(centroid(3)-zm(kk))
+           enddo
+
+ ! Quantities in gas phase
+           do icomp=1,5
+              flux(icomp) = flux(icomp) + (flux_irl%getVolume(id,1)+flux_irl%getVolume(id,2))*phi_reconstruct(icomp)
+           end do
+           do icomp=6,10
+              flux(icomp) = flux(icomp) + (flux_irl%getVolume(id,1)+flux_irl%getVolume(id,2))*phi_reconstruct(icomp)
+           end do
+	   flux(ncomp) = flux(ncomp) + flux_irl%getVolume(id,1)
+	   volume = volume + flux_irl%getVolume(id,1) + flux_irl%getVolume(id,2)
+
+         enddo
+      enddo
+   enddo
+
+
+   !call flux_irl%delete()
+
+ end subroutine compute_fluxes
+ 
+end module compute_flux_module
