@@ -1,11 +1,9 @@
-max_step  = 800
+max_step  = 300
 stop_time = 100.0
 
 # PROBLEM SIZE & GEOMETRY
 geometry.is_periodic =  0  0  0
 geometry.coord_sys   =  0       # 0 => cart
-#geometry.prob_lo     =  -1.000 -0.1 -1.000
-#geometry.prob_hi     =  1.000 0.1 2.000
 geometry.prob_lo     =  -0.5 -0.5 -0.1 
 geometry.prob_hi     =  0.5 0.5 0.1
 
