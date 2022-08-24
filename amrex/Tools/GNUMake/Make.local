@@ -14,7 +14,7 @@
 #
 #   Wrappers for C++, C and Fortran compilers.
 
-IRLDIR=/Users/natarajan/Desktop/Research/MultiphaseAMR/MultiphaseSolverAMR/irl_2022/interfacereconstructionlibrary/
+IRLDIR=<full path to MultiphaseSolverAMReX/interfacereconstructionlibrary>
 CXX := /opt/local/bin/mpicxx
 CC  := /opt/local/bin/mpicc
 FC  := /opt/local/bin/mpif90
