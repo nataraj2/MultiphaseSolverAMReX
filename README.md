@@ -1,4 +1,4 @@
-# Mutiphase flow solver in AMReX
+# Multiphase flow solver in AMReX
 The code requires the installation of two libraries - AMReX and IRL, both of which are 
 provided in this repository. Hence, this repository is self-contained, and no external packages 
 need to be installed.
