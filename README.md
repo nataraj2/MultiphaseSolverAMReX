@@ -39,7 +39,7 @@ be read by the earlier versions of VisIt. In the running directory, do
 ```
 sh run_output.sh
 ```
-This script will create a text file `movie.visit` (which contains a list of headers of the solution files -- which has all 
+This script will create a text file `movie.visit` (which contains a list of headers of the solution files - which has all 
 the flow variables). This also creates a directory `ensight-3D`, in which all plic data is 
 written. A file `plic.visit` is also written inside `ensight-3D`. Both `movie.visit` and `plic.visit`
  can be loaded simultaneously into VisIt and visualized.
