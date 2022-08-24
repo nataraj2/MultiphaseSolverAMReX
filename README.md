@@ -10,7 +10,7 @@ cd MultiphaseSolverAMReX
 sh install.sh
 ```
 ```
-vi Tools/GNUMake/Make.local
+vi amrex/Tools/GNUMake/Make.local
 ```
 In Make.local, change the path to IRLDIR, and the compilers CXX, CC, FC, F90. 
 Make sure to use MPI compilers.
