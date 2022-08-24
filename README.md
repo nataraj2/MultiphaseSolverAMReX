@@ -23,7 +23,7 @@ Make sure to use mpi compilers.
 3. sh run_3d.sh
 ```
 
-#Visualization
+# Visualization
 VisIt 2.13 is the minimum version needed for visualization. The AMReX files cannot 
 be read by the earlier versions of VisIt.
 ```
