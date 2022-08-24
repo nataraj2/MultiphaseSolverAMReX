@@ -13,5 +13,13 @@
 9. cd ../../amrex
 10. vi Tools/GNUMake/Make.local
 ```
-- Change path to IRLDIR, and the compilers CXX, CC, FC, F90
+In Make.local, change the path to IRLDIR, and the compilers CXX, CC, FC, F90
+
+# How to run?
+```
+cd Tutorials/Amr/MultiphaseSolver_Zalesak_Elvira/Exec/Zalesak_Elvira
+make -j
+sh run_3d.sh
+```
+
 
