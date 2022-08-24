@@ -18,7 +18,7 @@ In the first 5 lines of `Make.local`, change the path to `IRLDIR`, and the compi
 # Running
 The following is to run the case of Zalesak's disk.
 ```
-cd Tutorials/Amr/MultiphaseSolver_Zalesak_Elvira/Exec/Zalesak_Elvira
+cd amrex/Tutorials/Amr/MultiphaseSolver_Zalesak_Elvira/Exec/Zalesak_Elvira
 make -j
 sh run_3d.sh
 ```
