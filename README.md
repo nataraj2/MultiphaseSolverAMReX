@@ -25,9 +25,9 @@ Make sure to use mpi compilers.
 
 # Visualization
 VisIt 2.13 is the minimum version needed for visualization. The AMReX files cannot 
-be read by the earlier versions of VisIt.
+be read by the earlier versions of VisIt. In the running directory, do
 ```
-run_output.sh
+sh run_output.sh
 ```
 will create a text file movie.visit (which contains a list of headers of the files which has all 
 the flow variables), and a file plic.visit in the directory ensight-3D, in which all plic data is 
