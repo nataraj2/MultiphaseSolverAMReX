@@ -1,10 +1,15 @@
 # Mutiphase flow solver in AMReX
+The code requires the installation of two libraries - AMReX and IRL, both of which are 
+provided in this repository. Hence, this repository is self-contained, and no external packages 
+need to be installed.
 
 # Installation and compilation 
 ```
 git clone https://github.com/nataraj2/MultiphaseSolverAMReX.git
 cd MultiphaseSolverAMReX
 sh install.sh
+```
+```
 vi Tools/GNUMake/Make.local
 ```
 In Make.local, change the path to IRLDIR, and the compilers CXX, CC, FC, F90. 
