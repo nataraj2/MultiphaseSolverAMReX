@@ -3,6 +3,7 @@
 # Installation and compilation 
 ```
 git clone https://github.com/nataraj2/MultiphaseSolverAMReX.git
+cd MultiphaseSolverAMReX
 sh install.sh
 vi Tools/GNUMake/Make.local
 ```

@@ -1,4 +1,3 @@
-cd MultiphaseSolverAMReX
 cd interfacereconstructionlibrary
 mkdir build
 cd build
