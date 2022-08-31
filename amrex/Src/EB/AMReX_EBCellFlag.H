@@ -1,12 +1,15 @@
 #ifndef AMREX_EBCELLFLAG_H_
 #define AMREX_EBCELLFLAG_H_
+#include <AMReX_Config.H>
 
-#include <cstdint>
-#include <iostream>
 #include <AMReX_Array.H>
 #include <AMReX_IntVect.H>
 #include <AMReX_BaseFab.H>
 #include <AMReX_FabFactory.H>
+
+#include <cstdint>
+#include <map>
+#include <iosfwd>
 
 namespace amrex {
 
@@ -33,27 +36,26 @@ public:
         return *this;
     }
 
-    AMREX_GPU_HOST_DEVICE
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     void setRegular () noexcept {
         flag &= zero_lower_mask; //!< clean lower bits
         flag |= regular_bits;
         flag |= single_vof_bits;
     }
 
-    AMREX_GPU_HOST_DEVICE
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     void setCovered () noexcept {
-        flag &= zero_lower_mask;
-        flag |= covered_bits;
+        flag = covered_value;
     }
 
-    AMREX_GPU_HOST_DEVICE
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     void setSingleValued () noexcept {
         flag &= zero_lower_mask;
-        flag |= single_vauled_bits;
+        flag |= single_valued_bits;
         flag |= single_vof_bits;
     }
 
-    AMREX_GPU_HOST_DEVICE
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     void setMultiValued (int n) noexcept {
         flag &= zero_lower_mask;
         flag |= multi_valued_bits;
@@ -61,45 +63,45 @@ public:
         flag |= static_cast<uint32_t>(n) << pos_numvofs;
     }
 
-    AMREX_GPU_HOST_DEVICE
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     bool operator==(const EBCellFlag& a_input) const noexcept
     {
         return (flag == (a_input.flag));
     }
 
-    AMREX_GPU_HOST_DEVICE
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     bool operator!=(const EBCellFlag& a_input) const noexcept
     {
         return (flag != (a_input.flag));
     }
 
-    AMREX_GPU_HOST_DEVICE
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     int getNumVoFs () const noexcept
     {
         return (flag & one_numvofs_mask) >> pos_numvofs;
     }
 
-    AMREX_GPU_HOST_DEVICE
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     bool isRegular () const noexcept {
         return (flag & one_type_mask) == regular_bits;
     }
 
-    AMREX_GPU_HOST_DEVICE
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     bool isSingleValued () const noexcept {
-        return (flag & one_type_mask) == single_vauled_bits;
+        return (flag & one_type_mask) == single_valued_bits;
     }
 
-    AMREX_GPU_HOST_DEVICE
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     bool isMultiValued () const noexcept {
         return (flag & one_type_mask) == multi_valued_bits;
     }
 
-    AMREX_GPU_HOST_DEVICE
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     bool isCovered () const noexcept {
         return (flag & one_type_mask) == covered_bits;
     }
 
-    AMREX_GPU_HOST_DEVICE
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     bool isConnected (const IntVect& iv) const noexcept {
         int i=0, j=0, k=0;
         AMREX_D_TERM(i=iv[0];, j=iv[1];, k=iv[2]);
@@ -107,18 +109,32 @@ public:
         return flag & (1 << n);
     }
 
-    AMREX_GPU_HOST_DEVICE
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     bool isConnected (int i, int j, int k) const  noexcept {
         const int n = w_lower_mask + 13 + i + 3*j + k*9;  // pos_ngbr[k+1,j+1,i+1]
         return flag & (1 << n);
     }
 
-    AMREX_GPU_HOST_DEVICE
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    bool isDisconnected (const IntVect& iv) const noexcept {
+        int i=0, j=0, k=0;
+        AMREX_D_TERM(i=iv[0];, j=iv[1];, k=iv[2]);
+        const int n = w_lower_mask + 13 + i + 3*j + k*9;  // pos_ngbr[k+1,j+1,i+1]
+        return !(flag & (1 << n));
+    }
+
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    bool isDisconnected (int i, int j, int k) const  noexcept {
+        const int n = w_lower_mask + 13 + i + 3*j + k*9;  // pos_ngbr[k+1,j+1,i+1]
+        return !(flag & (1 << n));
+    }
+
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     void setDisconnected () noexcept {
         flag &= one_lower_mask;
     }
 
-    AMREX_GPU_HOST_DEVICE
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     void setDisconnected (const IntVect& iv) noexcept {
         int i=0, j=0, k=0;
         AMREX_D_TERM(i=iv[0];, j=iv[1];, k=iv[2]);
@@ -126,12 +142,18 @@ public:
         flag &= ~(1 << n);
     }
 
-    AMREX_GPU_HOST_DEVICE
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    void setDisconnected (int i, int j, int k) noexcept {
+        const int n = w_lower_mask + 13 + i + 3*j + k*9;  // pos_ngbr[k+1,j+1,i+1]
+        flag &= ~(1 << n);
+    }
+
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     void setConnected () noexcept {
         flag |= zero_lower_mask;
     }
 
-    AMREX_GPU_HOST_DEVICE
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     void setConnected (const IntVect& iv) noexcept {
         int i=0, j=0, k=0;
         AMREX_D_TERM(i=iv[0];, j=iv[1];, k=iv[2]);
@@ -139,16 +161,66 @@ public:
         flag |= 1 << n;
     }
 
-    AMREX_GPU_HOST_DEVICE
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    void setConnected (int i, int j, int k) noexcept {
+        const int n = w_lower_mask + 13 + i + 3*j + k*9;  // pos_ngbr[k+1,j+1,i+1]
+        flag |= 1 << n;
+    }
+
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    int numNeighbors () const noexcept {
+        int n = 1;
+        n += isConnected(-1,-1, 0);
+        n += isConnected( 0,-1, 0);
+        n += isConnected( 1,-1, 0);
+        //
+        n += isConnected(-1, 0, 0);
+        n += isConnected( 1, 0, 0);
+        //
+        n += isConnected(-1, 1, 0);
+        n += isConnected( 0, 1, 0);
+        n += isConnected( 1, 1, 0);
+#if (AMREX_SPACEDIM == 3)
+        n += isConnected(-1,-1,-1);
+        n += isConnected( 0,-1,-1);
+        n += isConnected( 1,-1,-1);
+        //
+        n += isConnected(-1, 0,-1);
+        n += isConnected( 0, 0,-1);
+        n += isConnected( 1, 0,-1);
+        //
+        n += isConnected(-1, 1,-1);
+        n += isConnected( 0, 1,-1);
+        n += isConnected( 1, 1,-1);
+        //
+        n += isConnected(-1,-1, 1);
+        n += isConnected( 0,-1, 1);
+        n += isConnected( 1,-1, 1);
+        //
+        n += isConnected(-1, 0, 1);
+        n += isConnected( 0, 0, 1);
+        n += isConnected( 1, 0, 1);
+        //
+        n += isConnected(-1, 1, 1);
+        n += isConnected( 0, 1, 1);
+        n += isConnected( 1, 1, 1);
+#endif
+        return n;
+    }
+
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     uint32_t getValue() const noexcept
     {
         return flag;
     }
 
-    AMREX_GPU_HOST_DEVICE
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     static constexpr EBCellFlag TheDefaultCell () { return EBCellFlag{default_value}; }
 
-    AMREX_GPU_HOST_DEVICE
+    // DO NOT test covered cells using cell == TheCoveredCell()
+    // Use cell.isCovered() instead.
+    // Each covered cell is covered in its own way.
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     static constexpr EBCellFlag TheCoveredCell () { return EBCellFlag{covered_value}; }
 
 private:
@@ -168,7 +240,7 @@ private:
     //! these represent cell types
     //! note that single-valued means single-value cut cell
     static constexpr uint32_t regular_bits        =  0x0;
-    static constexpr uint32_t single_vauled_bits  =  0x1;
+    static constexpr uint32_t single_valued_bits  =  0x1;
     static constexpr uint32_t multi_valued_bits   =  0x2;
     static constexpr uint32_t covered_bits        =  0x3;
 
@@ -209,8 +281,10 @@ private:
     uint32_t flag = default_value;
 };
 
+template <>
+struct IsStoreAtomic<EBCellFlag> : std::true_type {};
 
-class EBCellFlagFab
+class EBCellFlagFab final
     : public BaseFab<EBCellFlag>
 {
 public:
@@ -227,31 +301,52 @@ public:
 
     EBCellFlagFab (const EBCellFlagFab& rhs, MakeType make_type, int scomp, int ncomp);
 
-    EBCellFlagFab () noexcept = default;
-    EBCellFlagFab (EBCellFlagFab&& rhs) noexcept = default;
-    ~EBCellFlagFab () noexcept = default;
+    EBCellFlagFab () = default;
+    EBCellFlagFab (EBCellFlagFab&& rhs) = default;
+    virtual ~EBCellFlagFab () override = default;
 
     EBCellFlagFab (const EBCellFlagFab&) = delete;
     EBCellFlagFab& operator= (const EBCellFlagFab&) = delete;
     EBCellFlagFab& operator= (EBCellFlagFab&&) = delete;
 
-    AMREX_GPU_HOST_DEVICE
+    /**
+     * \brief Returns FabType of the whole EBCellFlagFab.
+     */
     FabType getType () const noexcept { return m_type; }
 
+    /**
+     * \brief Returns FabType in the given Box of this EBCellFlagFab.
+     */
     FabType getType (const Box& bx) const noexcept;
 
-    AMREX_GPU_HOST_DEVICE
-    const Box& getRegion () const noexcept { return m_region; }
+    /**
+     * \brief Returns the number of regular cells in the given Box.
+     */
+    int getNumRegularCells (const Box& bx) const noexcept;
 
-    AMREX_GPU_HOST_DEVICE
+    /**
+     * \brief Returns the number of cut cells in the given Box.
+     */
+    int getNumCutCells (const Box& bx) const noexcept;
+
+    /**
+     * \brief Returns the number of covered cells in the given Box.
+     */
+    int getNumCoveredCells (const Box& bx) const noexcept;
+
     void setType (FabType t) noexcept { m_type = t; }
 
-    AMREX_GPU_HOST_DEVICE
-    void setRegion (const Box& bx) noexcept { m_region = bx; }
+    struct NumCells {
+        int nregular = 0;
+        int nsingle = 0;
+        int nmulti = 0;
+        int ncovered = 0;
+        FabType type = FabType::undefined;
+    };
 
 private:
     FabType m_type = FabType::undefined;
-    Box m_region;
+    mutable std::map<Box,NumCells> m_typemap;
 };
 
 std::ostream& operator<< (std::ostream& os, const EBCellFlag& flag);

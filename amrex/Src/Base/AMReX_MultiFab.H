@@ -1,15 +1,20 @@
 
 #ifndef BL_MULTIFAB_H
 #define BL_MULTIFAB_H
-
-
-#include <cstdint>
+#include <AMReX_Config.H>
 
 #include <AMReX_BLassert.H>
 #include <AMReX_FArrayBox.H>
 #include <AMReX_FabArray.H>
 #include <AMReX_FabArrayUtility.H>
 #include <AMReX_Periodicity.H>
+#include <AMReX_NonLocalBC.H>
+
+#ifdef AMREX_USE_EB
+#include <AMReX_EBMultiFabUtil.H>
+#endif
+
+#include <cstdint>
 
 namespace amrex
 {
@@ -22,8 +27,8 @@ class iMultiFab;
  * This class is useful for storing floating point data on a domain defined by
  * a union of rectangular regions embedded in a uniform index space.
  * MultiFab class extends the function of the underlying FabArray class just
- * as the FArrayBox class extends the funtion of BaseFab<Real>.
- *Additional member functions are defined for I/O and simple arithmetic operations on these aggregate objects.
+ * as the FArrayBox class extends the function of BaseFab<Real>.
+ * Additional member functions are defined for I/O and simple arithmetic operations on these aggregate objects.
  * This class does NOT provide a copy constructor or assignment operator.
  */
 
@@ -32,12 +37,23 @@ class MultiFab
     public FabArray<FArrayBox>
 {
 public:
+
     /**
     * \brief Constructs an empty MultiFab.  Data can be defined at a later
     * time using the define member functions inherited
     * from FabArray.
     */
     MultiFab () noexcept;
+
+    /**
+    * \brief Constructs an empty MultiFab.  Data can be defined at a later
+    * time using the define member functions inherited from FabArray.  If
+    * `define` is called later with a nulltpr as MFInfo's arena, the default
+    * Arena `a` will be used.  If the arena in MFInfo is not a nullptr, the
+    * MFInfo's arena will be used.
+    */
+    explicit MultiFab (Arena* a) noexcept;
+
     /**
     * \brief
     * Constructs a MultiFab
@@ -47,9 +63,9 @@ public:
     * \param ngrow number of cells the region grows
     * \param info MFInfo
 
-    * The size of the FArrayBox is given by the Box grown by ngrow and
-    * the number of components is given by ncomp.  If info is set to
-    * not allocateing memroy, then no FArrayBoxes are allocated at
+    * The size of the FArrayBox is given by the Box grown by ngrow, and
+    * the number of components is given by ncomp. If info is set to
+    * not allocating memory, then no FArrayBoxes are allocated at
     * this time but can be defined later.
     */
     MultiFab (const BoxArray&            bs,
@@ -57,10 +73,10 @@ public:
               int                        ncomp,
               int                        ngrow,
 #ifdef AMREX_STRICT_MODE
-	      const MFInfo&              info,
+              const MFInfo&              info,
               const FabFactory<FArrayBox>& factory);
 #else
-	      const MFInfo&              info = MFInfo(),
+              const MFInfo&              info = MFInfo(),
               const FabFactory<FArrayBox>& factory = FArrayBoxFactory());
 #endif
 
@@ -69,10 +85,10 @@ public:
               int                        ncomp,
               const IntVect&             ngrow,
 #ifdef AMREX_STRICT_MODE
-	      const MFInfo&              info,
+              const MFInfo&              info,
               const FabFactory<FArrayBox>& factory);
 #else
-	      const MFInfo&              info = MFInfo(),
+              const MFInfo&              info = MFInfo(),
               const FabFactory<FArrayBox>& factory = FArrayBoxFactory());
 #endif
 
@@ -93,26 +109,26 @@ public:
     MultiFab& operator= (const MultiFab& rhs) = delete;
 
     virtual void define (const BoxArray&            bxs,
-			 const DistributionMapping& dm,
-			 int                        nvar,
-			 int                        ngrow,
+                         const DistributionMapping& dm,
+                         int                        nvar,
+                         int                        ngrow,
 #ifdef AMREX_STRICT_MODE
-			 const MFInfo&              info,
+                         const MFInfo&              info,
                          const FabFactory<FArrayBox>& factory) override;
 #else
-			 const MFInfo&              info = MFInfo(),
+                         const MFInfo&              info = MFInfo(),
                          const FabFactory<FArrayBox>& factory = FArrayBoxFactory()) override;
 #endif
 
     virtual void define (const BoxArray&            bxs,
-			 const DistributionMapping& dm,
-			 int                        nvar,
-			 const IntVect&             ngrow,
+                         const DistributionMapping& dm,
+                         int                        nvar,
+                         const IntVect&             ngrow,
 #ifdef AMREX_STRICT_MODE
-			 const MFInfo&              info,
+                         const MFInfo&              info,
                          const FabFactory<FArrayBox>& factory) override;
 #else
-			 const MFInfo&              info = MFInfo(),
+                         const MFInfo&              info = MFInfo(),
                          const FabFactory<FArrayBox>& factory = FArrayBoxFactory()) override;
 #endif
 
@@ -126,7 +142,7 @@ public:
     */
     Real min (int comp,
               int nghost = 0,
-	      bool local = false) const;
+              bool local = false) const;
     /**
     * \brief Identical to min() function, but confines its
     * search to intersection of Box b and the MultiFab.
@@ -134,7 +150,7 @@ public:
     Real min (const Box& b,
               int        comp,
               int        nghost = 0,
-	      bool       local = false) const;
+              bool       local = false) const;
     /**
     * \brief Returns the maximum value contained in component comp of the
     * MultiFab.  The parameter nghost determines the number of
@@ -143,7 +159,7 @@ public:
     */
     Real max (int comp,
               int nghost = 0,
-	      bool local = false) const;
+              bool local = false) const;
     /**
     * \brief Identical to the previous max() function, but confines its
     * search to intersection of Box b and the MultiFab.
@@ -151,14 +167,14 @@ public:
     Real max (const Box& b,
               int        comp,
               int        nghost = 0,
-	      bool       local = false) const;
+              bool       local = false) const;
     /**
     * \brief Returns the maximum *absolute* value contained in
     * component comp of the MultiFab.
     */
-    Real norm0 (int comp = 0, int nghost = 0, bool local = false) const;
-    Real norminf (int comp = 0, int nghost = 0, bool local = false) const {
-        return norm0(comp,nghost,local);
+    Real norm0 (int comp = 0, int nghost = 0, bool local = false, bool ignore_covered = false ) const;
+    Real norminf (int comp = 0, int nghost = 0, bool local = false, bool ignore_covered = false ) const {
+        return norm0(comp,nghost,local,ignore_covered);
     }
 
     Real norm0 (const iMultiFab& mask, int comp = 0, int nghost = 0, bool local = false) const;
@@ -166,20 +182,27 @@ public:
         return norm0(mask,comp,nghost,local);
     }
 
+    Real norm0 (int comp, int ncomp, IntVect const& nghost, bool local = false,
+                bool ignore_covered = false) const;
+    Real norminf (int comp, int ncomp, IntVect const& nghost, bool local = false,
+                  bool ignore_covered = false) const {
+        return norm0(comp, ncomp, nghost, local, ignore_covered);
+    }
+
     /**
     * \brief Returns the maximum *absolute* values contained in
     * each component of "comps" of the MultiFab.  No ghost cells are used.
     */
-    Vector<Real> norm0 (const Vector<int>& comps, int nghost = 0, bool local = false) const;
-    Vector<Real> norminf (const Vector<int>& comps, int nghost = 0, bool local = false) const {
-        return norm0(comps,nghost,local);
+    Vector<Real> norm0 (const Vector<int>& comps, int nghost = 0, bool local = false, bool ignore_covered = false ) const;
+    Vector<Real> norminf (const Vector<int>& comps, int nghost = 0, bool local = false, bool ignore_covered = false) const {
+        return norm0(comps,nghost,local,ignore_covered);
     }
 
     /**
     * \brief Returns the L1 norm of component "comp" over the MultiFab.
     * No ghost cells are used.  This version has no double counting for nodal data.
     */
-    Real norm1 (int comp, const Periodicity& period) const;
+    Real norm1 (int comp, const Periodicity& period, bool ignore_covered = false) const;
     /**
     * \brief Returns the L1 norm of component "comp" over the MultiFab.
     * ngrow ghost cells are used.
@@ -209,6 +232,13 @@ public:
     * \brief Returns the sum of component "comp" over the MultiFab -- no ghost cells are included.
     */
     Real sum (int comp = 0, bool local = false) const;
+    /**
+    * \brief Same as sum with local=false, but for non-cell-centered data, this
+    *        skips non-unique points that are owned by multiple boxes.
+    */
+    Real sum_unique (int comp = 0,
+                     bool local = false,
+                     const Periodicity& period = Periodicity::NonPeriodic()) const;
     /**
     * \brief Adds the scalar value val to the value of each cell in the
     * specified subregion of the MultiFab.  The subregion consists
@@ -409,30 +439,36 @@ public:
     * against divide by zero.
     */
     void divide (const MultiFab& mf,
-		 int             strt_comp,
-		 int             num_comp,
-		 int             nghost);
+                 int             strt_comp,
+                 int             num_comp,
+                 int             nghost);
     /**
     * \brief Returns the dot product of two MultiFabs.
     */
     static Real Dot (const MultiFab& x, int xcomp,
-		     const MultiFab& y, int ycomp,
-		     int num_comp, int nghost, bool local = false);
+                     const MultiFab& y, int ycomp,
+                     int num_comp, int nghost, bool local = false);
+
+    /**
+    * \brief Returns the dot product of a MultiFab with itself.
+    */
+    static Real Dot (const MultiFab& x, int xcomp,
+                     int num_comp, int nghost, bool local = false);
 
     static Real Dot (const iMultiFab& mask,
                      const MultiFab& x, int xcomp,
-		     const MultiFab& y, int ycomp,
-		     int num_comp, int nghost, bool local = false);
+                     const MultiFab& y, int ycomp,
+                     int num_comp, int nghost, bool local = false);
     /**
     * \brief Add src to dst including nghost ghost cells.
     * The two MultiFabs MUST have the same underlying BoxArray.
     */
     static void Add (MultiFab&       dst,
-		     const MultiFab& src,
-		     int             srccomp,
-		     int             dstcomp,
-		     int             numcomp,
-		     int             nghost);
+                     const MultiFab& src,
+                     int             srccomp,
+                     int             dstcomp,
+                     int             numcomp,
+                     int             nghost);
 
     static void Add (MultiFab&       dst,
                      const MultiFab& src,
@@ -459,111 +495,158 @@ public:
                       int             numcomp,
                       const IntVect&  nghost);
 
-#ifdef USE_PERILLA
-    static void Copy (MultiFab&       dst,
-                const MultiFab& src,
-                int             f,
-                int             srccomp,
-                int             dstcomp,
-                int             numcomp,
-                const Box&      bx);
-#endif
+    /**
+    * \brief Swap from src to dst including nghost ghost cells.
+    * The two MultiFabs MUST have the same underlying BoxArray.
+    * The swap is local.
+    */
+    static void Swap (MultiFab&       dst,
+                      MultiFab&       src,
+                      int             srccomp,
+                      int             dstcomp,
+                      int             numcomp,
+                      int             nghost);
+
+    static void Swap (MultiFab&       dst,
+                      MultiFab&       src,
+                      int             srccomp,
+                      int             dstcomp,
+                      int             numcomp,
+                      const IntVect&  nghost);
 
     /**
     * \brief Subtract src from dst including nghost ghost cells.
     * The two MultiFabs MUST have the same underlying BoxArray.
     */
     static void Subtract (MultiFab&       dst,
-			  const MultiFab& src,
-			  int             srccomp,
-			  int             dstcomp,
-			  int             numcomp,
-			  int             nghost);
+                          const MultiFab& src,
+                          int             srccomp,
+                          int             dstcomp,
+                          int             numcomp,
+                          int             nghost);
 
     static void Subtract (MultiFab&       dst,
-			  const MultiFab& src,
-			  int             srccomp,
-			  int             dstcomp,
-			  int             numcomp,
-			  const IntVect&  nghost);
+                          const MultiFab& src,
+                          int             srccomp,
+                          int             dstcomp,
+                          int             numcomp,
+                          const IntVect&  nghost);
     /**
     * \brief Multiply dst by src including nghost ghost cells.
     * The two MultiFabs MUST have the same underlying BoxArray.
     */
     static void Multiply (MultiFab&       dst,
-			  const MultiFab& src,
-			  int             srccomp,
-			  int             dstcomp,
-			  int             numcomp,
-			  int             nghost);
+                          const MultiFab& src,
+                          int             srccomp,
+                          int             dstcomp,
+                          int             numcomp,
+                          int             nghost);
 
     static void Multiply (MultiFab&       dst,
-			  const MultiFab& src,
-			  int             srccomp,
-			  int             dstcomp,
-			  int             numcomp,
-			  const IntVect&  nghost);
+                          const MultiFab& src,
+                          int             srccomp,
+                          int             dstcomp,
+                          int             numcomp,
+                          const IntVect&  nghost);
     /**
     * \brief Divide dst by src including nghost ghost cells.
     * The two MultiFabs MUST have the same underlying BoxArray.
     */
     static void Divide (MultiFab&       dst,
-			const MultiFab& src,
-			int             srccomp,
-			int             dstcomp,
-			int             numcomp,
-			int             nghost);
+                        const MultiFab& src,
+                        int             srccomp,
+                        int             dstcomp,
+                        int             numcomp,
+                        int             nghost);
 
     static void Divide (MultiFab&       dst,
-			const MultiFab& src,
-			int             srccomp,
-			int             dstcomp,
-			int             numcomp,
-			const IntVect&  nghost);
+                        const MultiFab& src,
+                        int             srccomp,
+                        int             dstcomp,
+                        int             numcomp,
+                        const IntVect&  nghost);
     /**
     * \brief dst += a*src
     */
     static void Saxpy (MultiFab&       dst,
-		       Real            a,
-		       const MultiFab& src,
-		       int             srccomp,
-		       int             dstcomp,
-		       int             numcomp,
-		       int             nghost);
+                       Real            a,
+                       const MultiFab& src,
+                       int             srccomp,
+                       int             dstcomp,
+                       int             numcomp,
+                       int             nghost);
+
+    static void Saxpy (MultiFab&       dst,
+                       Real            a,
+                       const MultiFab& src,
+                       int             srccomp,
+                       int             dstcomp,
+                       int             numcomp,
+                       const IntVect&  nghost);
+
     /**
     * \brief dst = src + a*dst
     */
     static void Xpay (MultiFab&       dst,
-		      Real            a,
-		      const MultiFab& src,
-		      int             srccomp,
-		      int             dstcomp,
-		      int             numcomp,
-		      int             nghost);
+                      Real            a,
+                      const MultiFab& src,
+                      int             srccomp,
+                      int             dstcomp,
+                      int             numcomp,
+                      int             nghost);
+
+    static void Xpay (MultiFab&       dst,
+                      Real            a,
+                      const MultiFab& src,
+                      int             srccomp,
+                      int             dstcomp,
+                      int             numcomp,
+                      const IntVect&  nghost);
     /**
     * \brief dst = a*x + b*y
     */
     static void LinComb (MultiFab&       dst,
-			 Real            a,
-			 const MultiFab& x,
-			 int             xcomp,
-			 Real            b,
-			 const MultiFab& y,
-			 int             ycomp,
-			 int             dstcomp,
-			 int             numcomp,
-			 int             nghost);
+                         Real            a,
+                         const MultiFab& x,
+                         int             xcomp,
+                         Real            b,
+                         const MultiFab& y,
+                         int             ycomp,
+                         int             dstcomp,
+                         int             numcomp,
+                         int             nghost);
+
+    static void LinComb (MultiFab&       dst,
+                         Real            a,
+                         const MultiFab& x,
+                         int             xcomp,
+                         Real            b,
+                         const MultiFab& y,
+                         int             ycomp,
+                         int             dstcomp,
+                         int             numcomp,
+                         const IntVect&  nghost);
+
     /**
     * \brief dst += src1*src2
     */
     static void AddProduct (MultiFab&       dst,
-			    const MultiFab& src1,
-			    int             comp1,
-			    const MultiFab& src2,
-			    int             comp2,
-			    int             dstcomp,
-			    int             numcomp,
-			    int             nghost);
+                            const MultiFab& src1,
+                            int             comp1,
+                            const MultiFab& src2,
+                            int             comp2,
+                            int             dstcomp,
+                            int             numcomp,
+                            int             nghost);
+
+    static void AddProduct (MultiFab&       dst,
+                            const MultiFab& src1,
+                            int             comp1,
+                            const MultiFab& src2,
+                            int             comp2,
+                            int             dstcomp,
+                            int             numcomp,
+                            const IntVect&  nghost);
 
     /**
     * \brief Are there any NaNs in the MF?
@@ -586,32 +669,6 @@ public:
     bool contains_inf (int scomp, int ncomp, const IntVect& ngrow, bool local=false) const;
 
     /**
-    * \brief This tests on whether the MultiFab is fully nodal.
-    */
-    bool is_nodal () const noexcept;
-    /**
-    * \brief This tests on whether the MultiFab is nodal in direction dir.
-    */
-    bool is_nodal (int dir) const noexcept;
-    /**
-    * \brief This tests on whether the MultiFab is cell-centered.
-    */
-    bool is_cell_centered () const noexcept;
-
-    /**
-    * \brief Sum values in overlapped cells.  The destination is limited to valid cells.
-    */
-    void SumBoundary (const Periodicity& period = Periodicity::NonPeriodic());
-
-    void SumBoundary (int scomp, int ncomp, const Periodicity& period = Periodicity::NonPeriodic());
-
-    /**
-    * \brief Sum values in overlapped cells.  The destination is limited to valid + ngrow cells.
-    */
-    void SumBoundary (int scomp, int ncomp, IntVect const& ngrow,
-                      const Periodicity& period = Periodicity::NonPeriodic());
-
-    /**
      * \brief Return a mask indicating how many duplicates are in each point.
      */
     std::unique_ptr<MultiFab> OverlapMask (const Periodicity& period = Periodicity::NonPeriodic()) const;
@@ -623,8 +680,9 @@ public:
     //! Sync up nodal data with weights
     void WeightedSync (const MultiFab& wgt, const Periodicity& period = Periodicity::NonPeriodic());
     //! Sync up nodal data with owners overriding non-owners
-    void OverrideSync (const Periodicity& period = Periodicity::NonPeriodic());
     void OverrideSync (const iMultiFab& msk, const Periodicity& period = Periodicity::NonPeriodic());
+
+    using FabArray<FArrayBox>::OverrideSync;
 
     static void Initialize ();
     static void Finalize ();
@@ -638,16 +696,20 @@ private:
     void initVal ();
 };
 
+#ifndef _MSC_VER
 inline void GccPlacaterMF ()
 {
     std::allocator<MultiFab*> a1;
     std::allocator<MultiFab const*> a2;
     std::allocator<FabArray<FArrayBox>*> a3;
     std::allocator<FabArray<FArrayBox> const*> a4;
-}
 
-//!  This is a special version of FillBoundary for warpx
-void FillBoundary (Vector<MultiFab*> const& mf, const Periodicity& period);
+    amrex::ignore_unused(a1);
+    amrex::ignore_unused(a2);
+    amrex::ignore_unused(a3);
+    amrex::ignore_unused(a4);
+}
+#endif
 
 }
 

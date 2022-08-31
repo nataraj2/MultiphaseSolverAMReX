@@ -1,5 +1,6 @@
 #ifndef AMREX_EB2_H_
 #define AMREX_EB2_H_
+#include <AMReX_Config.H>
 
 #include <AMReX_Geometry.H>
 #include <AMReX_Vector.H>
@@ -14,8 +15,7 @@
 
 namespace amrex { namespace EB2 {
 
-extern int max_grid_size;
-extern bool compare_with_ch_eb;
+extern AMREX_EXPORT int max_grid_size;
 
 void useEB2 (bool);
 
@@ -38,19 +38,25 @@ public:
 
     static void pop () noexcept { m_instance.pop_back(); }
     static void clear () noexcept { m_instance.clear(); }
-    static const IndexSpace& top () { return *(m_instance.back()); }
+    static const IndexSpace& top () {
+        AMREX_ALWAYS_ASSERT_WITH_MESSAGE(!m_instance.empty(),
+                                         "Have you forgot to call EB2::build? It's required even if the geometry is all regular.");
+        return *(m_instance.back());
+    }
     static bool empty () noexcept { return m_instance.empty(); }
     static int size () noexcept { return m_instance.size(); }
 
     virtual const Level& getLevel (const Geometry & geom) const = 0;
     virtual const Geometry& getGeometry (const Box& domain) const = 0;
     virtual const Box& coarsestDomain () const = 0;
+    virtual void addFineLevels (int num_new_fine_levels) = 0;
 
 protected:
-    static Vector<std::unique_ptr<IndexSpace> > m_instance;
+    static AMREX_EXPORT Vector<std::unique_ptr<IndexSpace> > m_instance;
 };
 
-const IndexSpace* TopIndexSpaceIfPresent() noexcept;
+const IndexSpace* TopIndexSpaceIfPresent () noexcept;
+inline const IndexSpace* TopIndexSpace () noexcept { return TopIndexSpaceIfPresent(); }
 
 template <typename G>
 class IndexSpaceImp
@@ -60,7 +66,8 @@ public:
 
     IndexSpaceImp (const G& gshop, const Geometry& geom,
                    int required_coarsening_level, int max_coarsening_level,
-                   int ngrow);
+                   int ngrow, bool build_coarse_level_by_coarsening,
+                   bool extend_domain_face, int num_coarsen_opt);
 
     IndexSpaceImp (IndexSpaceImp<G> const&) = delete;
     IndexSpaceImp (IndexSpaceImp<G> &&) = delete;
@@ -74,40 +81,57 @@ public:
     virtual const Box& coarsestDomain () const final {
         return m_geom.back().Domain();
     }
+    virtual void addFineLevels (int num_new_fine_levels) final;
 
     using F = typename G::FunctionType;
 
 private:
 
+    G m_gshop;
+    bool m_build_coarse_level_by_coarsening;
+    bool m_extend_domain_face;
+    int m_num_coarsen_opt;
+
     Vector<GShopLevel<G> > m_gslevel;
     Vector<Geometry> m_geom;
     Vector<Box> m_domain;
     Vector<int> m_ngrow;
-    std::unique_ptr<F> m_impfunc;
 };
 
 #include <AMReX_EB2_IndexSpaceI.H>
+
+bool ExtendDomainFace ();
+int NumCoarsenOpt ();
 
 template <typename G>
 void
 Build (const G& gshop, const Geometry& geom,
        int required_coarsening_level, int max_coarsening_level,
-       int ngrow = 4)
+       int ngrow = 4, bool build_coarse_level_by_coarsening = true,
+       bool extend_domain_face = ExtendDomainFace(),
+       int num_coarsen_opt = NumCoarsenOpt())
 {
     BL_PROFILE("EB2::Initialize()");
     IndexSpace::push(new IndexSpaceImp<G>(gshop, geom,
                                           required_coarsening_level,
                                           max_coarsening_level,
-                                          ngrow));
+                                          ngrow, build_coarse_level_by_coarsening,
+                                          extend_domain_face,
+                                          num_coarsen_opt));
 }
 
 void Build (const Geometry& geom,
             int required_coarsening_level,
             int max_coarsening_level,
-            int ngrow = 4);
+            int ngrow = 4,
+            bool build_coarse_level_by_coarsening = true,
+            bool extend_domain_face = ExtendDomainFace(),
+            int num_coarsen_opt = NumCoarsenOpt());
 
 int maxCoarseningLevel (const Geometry& geom);
 int maxCoarseningLevel (IndexSpace const* ebis, const Geometry& geom);
+
+void addFineLevels (int num_new_fine_levels);
 
 }}
 

@@ -1,6 +1,13 @@
-#ifdef _OPENMP
-#include <omp.h>
+#include <AMReX_CArena.H>
+#include <AMReX_MemPool.H>
+#include <AMReX_Vector.H>
+#include <AMReX_OpenMP.H>
+
+#ifdef AMREX_MEM_PROFILING
+#include <AMReX_MemProfiler.H>
 #endif
+
+#include <AMReX_ParmParse.H>
 
 #include <iostream>
 #include <limits>
@@ -9,20 +16,6 @@
 #include <memory>
 #include <cstring>
 #include <cstdint>
-
-#include <AMReX_CArena.H>
-#include <AMReX_MemPool.H>
-#include <AMReX_Vector.H>
-
-#ifdef AMREX_MEM_PROFILING
-#include <AMReX_MemProfiler.H>
-#endif
-
-#include <AMReX_ParmParse.H>
-
-#ifdef USE_PERILLA_PTHREADS
-#include <WorkerThread.H>
-#endif
 
 using namespace amrex;
 
@@ -43,49 +36,36 @@ void amrex_mempool_init ()
 {
     if (!initialized)
     {
-	initialized = true;
+        initialized = true;
 
         ParmParse pp("fab");
-	pp.query("init_snan", init_snan);
+        pp.queryAdd("init_snan", init_snan);
 
-	int nthreads = 1;
+        int nthreads = OpenMP::get_max_threads();
 
-#ifdef _OPENMP
-	nthreads = omp_get_max_threads();
-#endif
+        the_memory_pool.resize(nthreads);
+        for (int i=0; i<nthreads; ++i) {
+            the_memory_pool[i] = std::make_unique<CArena>(0, ArenaInfo().SetCpuMemory());
+        }
 
-
-#ifdef USE_PERILLA_PTHREADS
-#ifdef _OPENMP
-	//Just in case Perilla thread spawns multiple OMP threads
-        nthreads *= perilla::nThreads();
-#else
-	nthreads = perilla::nThreads();
-#endif
-#endif
-
-	the_memory_pool.resize(nthreads);
-	for (int i=0; i<nthreads; ++i) {
-	    the_memory_pool[i].reset(new CArena);
-	}
-#ifdef _OPENMP
+#ifdef AMREX_USE_OMP
 #pragma omp parallel num_threads(nthreads)
 #endif
-	{
-	    size_t N = 1024*1024*sizeof(double);
-	    void *p = amrex_mempool_alloc(N);
-	    memset(p, 0, N);
-	    amrex_mempool_free(p);
-	}
+        {
+            size_t N = 1024*1024*sizeof(double);
+            void *p = amrex_mempool_alloc(N);
+            memset(p, 0, N);
+            amrex_mempool_free(p);
+        }
 
 #ifdef AMREX_MEM_PROFILING
-	MemProfiler::add("MemPool", std::function<MemProfiler::MemInfo()>
-			 ([] () -> MemProfiler::MemInfo {
-			     int MB_min, MB_max, MB_tot;
-			     amrex_mempool_get_stats(MB_min, MB_max, MB_tot);
-			     long b = MB_tot * (1024L*1024L);
-			     return {b, b};
-			 }));
+        MemProfiler::add("MemPool", std::function<MemProfiler::MemInfo()>
+                         ([] () -> MemProfiler::MemInfo {
+                             int MB_min, MB_max, MB_tot;
+                             amrex_mempool_get_stats(MB_min, MB_max, MB_tot);
+                             Long b = MB_tot * (1024L*1024L);
+                             return {b, b};
+                         }));
 #endif
     }
 }
@@ -98,38 +78,13 @@ void amrex_mempool_finalize ()
 
 void* amrex_mempool_alloc (size_t nbytes)
 {
-  int tid=0;
-
-#ifdef _OPENMP
-  tid = omp_get_thread_num();
-#endif
-
-#ifdef USE_PERILLA_PTHREADS
-#ifdef _OPENMP
-  tid = perilla::tid()*omp_get_max_threads()+tid;
-#else
-  tid = perilla::tid();
-#endif
-#endif
+  int tid = OpenMP::get_thread_num();
   return the_memory_pool[tid]->alloc(nbytes);
 }
 
-void amrex_mempool_free (void* p) 
+void amrex_mempool_free (void* p)
 {
-  int tid=0;
-
-#ifdef _OPENMP
-  tid = omp_get_thread_num();
-#endif
-
-#ifdef USE_PERILLA_PTHREADS
-#ifdef _OPENMP
-  tid = perilla::tid()*omp_get_max_threads()+tid;
-#else
-  tid = perilla::tid();
-#endif
-#endif
-
+  int tid = OpenMP::get_thread_num();
   the_memory_pool[tid]->free(p);
 }
 
@@ -156,14 +111,26 @@ void amrex_real_array_init (Real* p, size_t nelems)
 
 void amrex_array_init_snan (Real* p, size_t nelems)
 {
+#ifdef BL_USE_DOUBLE
+
 #ifdef UINT64_MAX
     const uint64_t snan = UINT64_C(0x7ff0000080000001);
-#else
-    static_assert(sizeof(double) == sizeof(long long), "MemPool: sizeof double != sizeof long long");
-    const long long snan = 0x7ff0000080000001LL;
-#endif
+    static_assert(sizeof(double) == sizeof(uint64_t), "MemPool: sizeof double != sizeof uint64_t");
     for (size_t i = 0; i < nelems; ++i) {
         std::memcpy(p++, &snan, sizeof(double));
     }
+#endif
+
+#else
+
+#ifdef UINT32_MAX
+    const uint32_t snan = UINT32_C(0x7fa00000);
+    static_assert(sizeof(float) == sizeof(uint32_t), "MemPool: sizeof float != sizeof uint32_t");
+    for (size_t i = 0; i < nelems; ++i) {
+        std::memcpy(p++, &snan, sizeof(float));
+    }
+#endif
+
+#endif
 }
 }

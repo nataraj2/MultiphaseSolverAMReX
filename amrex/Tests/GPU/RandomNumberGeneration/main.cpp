@@ -1,124 +1,77 @@
 #include <AMReX.H>
-#include <AMReX_MultiFab.H>
 #include <AMReX_Gpu.H>
-#include <AMReX_Utility.H>
-#include <AMReX_Array.H>
-#include <AMReX_CudaContainers.H>
+#include <AMReX_Random.H>
+#include <AMReX_ParmParse.H>
+#include <AMReX_BLProfiler.H>
+#include <cmath>
 
 using namespace amrex;
-
 
 void RandomNumGen();
 
 int main (int argc, char* argv[])
 {
-
     amrex::Initialize(argc,argv);
     RandomNumGen();
     amrex::Finalize();
-
 }
 
 void RandomNumGen ()
 {
-    int N = 1E5;
+    BL_PROFILE("main");
 
-#ifdef AMREX_USE_CUDA    
-    amrex::InitRandSeedOnDevice(N);
-    amrex::Print() << amrex::Gpu::Device::deviceId() << "\n";
-    amrex::Print() << amrex::ParallelDescriptor::MyProc() << "\n";
+    ParmParse pp;
 
-    Gpu::DeviceVector<double> d_xpos(N);
-    Gpu::DeviceVector<double> d_ypos(N);
-    Gpu::DeviceVector<double> d_zpos(N);
+    int Ndraw = 1000000;
 
-    double *dxpos = d_xpos.dataPtr();    
-    double *dypos = d_ypos.dataPtr();    
-    double *dzpos = d_zpos.dataPtr();    
-#else
-    amrex::InitRandom(1024UL,1);
-#endif
- 
-    amrex::Vector<double> hx(N);
-    amrex::Vector<double> hy(N);
-    amrex::Vector<double> hz(N);
-    double *hxpos = hx.dataPtr();    
-    double *hypos = hy.dataPtr();    
-    double *hzpos = hz.dataPtr();    
+    pp.query("num_draw", Ndraw);
 
+    Gpu::DeviceVector<Real> x_d(Ndraw);
+    Gpu::DeviceVector<Real> y_d(Ndraw);
+    Gpu::DeviceVector<Real> z_d(Ndraw);
 
-    int timesteps = 10; // just for example
-    for (int i=0; i<timesteps; i++)
     {
+        BL_PROFILE("Draw");
 
-        // an instance of growing vector //        
-        if ( i == 0){
-           int N2 = N + 1000;
-           N  = N2;
- 	}
+        auto x_d_ptr = x_d.dataPtr();
+        auto y_d_ptr = y_d.dataPtr();
+        auto z_d_ptr = z_d.dataPtr();
 
-        // an instance of growing vector //        
-        if ( i == 1){
-           int N2 = N + 1.2E5;
-           N  = N2;
- 	}
-          
-#ifdef AMREX_USE_CUDA    
-        if ( d_xpos.size() < N){
-           CheckSeedArraySizeAndResize(N);
-           d_xpos.resize(N);
-           d_ypos.resize(N);
-           d_zpos.resize(N);
-           dxpos = d_xpos.dataPtr();
-           dypos = d_ypos.dataPtr();
-           dzpos = d_zpos.dataPtr();
-        }
-#endif
-        if ( hx.size() < N){
-           hx.resize(N);
-           hy.resize(N);
-           hz.resize(N);
-           hxpos = hx.dataPtr();
-           hypos = hy.dataPtr();
-           hzpos = hz.dataPtr();
-        }
-        
-        
-        AMREX_PARALLEL_FOR_1D (N, idx,
+        amrex::ParallelForRNG(Ndraw,
+        [=] AMREX_GPU_DEVICE (int i, RandomEngine const& engine) noexcept
         {
-#ifdef AMREX_USE_CUDA    
-           dxpos[idx] = amrex::Random();
-           dypos[idx] = amrex::Random();
-           dzpos[idx] = amrex::Random();
-#else
-           hx[idx] = amrex::Random();
-           hy[idx] = amrex::Random();
-           hz[idx] = amrex::Random();
-#endif
+            x_d_ptr[i] = amrex::Random(engine);
+            y_d_ptr[i] = amrex::Random(engine);
+            z_d_ptr[i] = amrex::Random(engine);
         });
-   
-#ifdef AMREX_USE_CUDA    
-        cudaMemcpy(hxpos,dxpos,sizeof(double)*N,cudaMemcpyDeviceToHost);
-        cudaMemcpy(hypos,dypos,sizeof(double)*N,cudaMemcpyDeviceToHost);
-        cudaMemcpy(hzpos,dzpos,sizeof(double)*N,cudaMemcpyDeviceToHost);
-#endif
 
-        for (int i = 0; i < N; i++ )
-        {
-           amrex::Print() << i << " " << hx[i]  << " " << hy[i] << " " << hz[i]<< "\n";
-        }
-     
-
+        Gpu::streamSynchronize();
     }
-    hx.resize(0);
-    hy.resize(0);
-    hz.resize(0);
-    hx.shrink_to_fit();
-    hy.shrink_to_fit();
-    hz.shrink_to_fit();
+
+    std::vector<Real> x_h(Ndraw);
+    std::vector<Real> y_h(Ndraw);
+    std::vector<Real> z_h(Ndraw);
+    Gpu::copyAsync(Gpu::deviceToHost, x_d.begin(), x_d.end(), x_h.begin());
+    Gpu::copyAsync(Gpu::deviceToHost, y_d.begin(), y_d.end(), y_h.begin());
+    Gpu::copyAsync(Gpu::deviceToHost, z_d.begin(), z_d.end(), z_h.begin());
+    Gpu::streamSynchronize();
+
+    Real xmean=0., ymean=0., zmean=0., xvar=0., yvar=0., zvar=0.;
+    for (int i = 0; i < Ndraw; ++i) {
+        xmean += x_h[i];
+        ymean += y_h[i];
+        zmean += z_h[i];
+        xvar += std::pow(x_h[i]-0.5,2);
+        yvar += std::pow(y_h[i]-0.5,2);
+        zvar += std::pow(z_h[i]-0.5,2);
+    }
+    xmean /= Ndraw;
+    ymean /= Ndraw;
+    zmean /= Ndraw;
+    xvar /= Ndraw;
+    yvar /= Ndraw;
+    zvar /= Ndraw;
+    amrex::Print() << "\n  Means: " << xmean << ", " << ymean << ", " << zmean
+                   << "  Variances: " << xvar << ", " << yvar << ", " << zvar
+                   << std::endl;
 }
-
-
-
-
-

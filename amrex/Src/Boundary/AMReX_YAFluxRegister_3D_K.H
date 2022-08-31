@@ -1,11 +1,12 @@
 #ifndef AMREX_YAFLUXREGISTER_3D_K_H_
 #define AMREX_YAFLUXREGISTER_3D_K_H_
+#include <AMReX_Config.H>
 
 #include <AMReX_FArrayBox.H>
 
 namespace amrex {
 
-AMREX_GPU_HOST_DEVICE AMREX_INLINE
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
 void yafluxreg_crseadd (Box const& bx, Array4<Real> const& d, Array4<int const> const& flag,
                         Array4<Real const> const& fx,
                         Array4<Real const> const& fy,
@@ -24,7 +25,8 @@ void yafluxreg_crseadd (Box const& bx, Array4<Real> const& d, Array4<int const> 
                 for (int n = 0; n < nc; ++n) {
                     d(i,j,k,n) -= dtdx*fx(i,j,k,n);
                 }
-            } else if (flag(i+1,j,k) == amrex_yafluxreg_fine_cell) {
+            }
+            if (flag(i+1,j,k) == amrex_yafluxreg_fine_cell) {
                 for (int n = 0; n < nc; ++n) {
                     d(i,j,k,n) += dtdx*fx(i+1,j,k,n);
                 }
@@ -34,7 +36,8 @@ void yafluxreg_crseadd (Box const& bx, Array4<Real> const& d, Array4<int const> 
                 for (int n = 0; n < nc; ++n) {
                     d(i,j,k,n) -= dtdy*fy(i,j,k,n);
                 }
-            } else if (flag(i,j+1,k) == amrex_yafluxreg_fine_cell) {
+            }
+            if (flag(i,j+1,k) == amrex_yafluxreg_fine_cell) {
                 for (int n = 0; n < nc; ++n) {
                     d(i,j,k,n) += dtdy*fy(i,j+1,k,n);
                 }
@@ -44,7 +47,8 @@ void yafluxreg_crseadd (Box const& bx, Array4<Real> const& d, Array4<int const> 
                 for (int n = 0; n < nc; ++n) {
                     d(i,j,k,n) -= dtdz*fz(i,j,k,n);
                 }
-            } else if (flag(i,j,k+1) == amrex_yafluxreg_fine_cell) {
+            }
+            if (flag(i,j,k+1) == amrex_yafluxreg_fine_cell) {
                 for (int n = 0; n < nc; ++n) {
                     d(i,j,k,n) += dtdz*fz(i,j,k+1,n);
                 }
@@ -53,7 +57,7 @@ void yafluxreg_crseadd (Box const& bx, Array4<Real> const& d, Array4<int const> 
     }}}
 }
 
-AMREX_GPU_HOST_DEVICE AMREX_INLINE
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
 void yafluxreg_fineadd (Box const& bx, Array4<Real> const& d, Array4<Real const> const& f,
                         Real dtdx, int nc, int dirside, Dim3 const& rr) noexcept
 {
@@ -74,10 +78,7 @@ void yafluxreg_fineadd (Box const& bx, Array4<Real> const& d, Array4<Real const>
                         for (int joff = 0; joff < rr.y; ++joff) {
                             const int jj =      j*rr.y  + joff;
                             Real tmp = -dtdx*f(ii,jj,kk,n);
-#ifdef _OPENMP
-#pragma omp atomic
-#endif
-                            *dp += tmp;
+                            HostDevice::Atomic::Add(dp, tmp);
                         }
                     }
                 }
@@ -98,10 +99,7 @@ void yafluxreg_fineadd (Box const& bx, Array4<Real> const& d, Array4<Real const>
                         for (int joff = 0; joff < rr.y; ++joff) {
                             const int jj =      j*rr.y  + joff;
                             Real tmp = dtdx*f(ii,jj,kk,n);
-#ifdef _OPENMP
-#pragma omp atomic
-#endif
-                            *dp += tmp;
+                            HostDevice::Atomic::Add(dp, tmp);
                         }
                     }
                 }
@@ -122,10 +120,7 @@ void yafluxreg_fineadd (Box const& bx, Array4<Real> const& d, Array4<Real const>
                         for (int ioff = 0; ioff < rr.x; ++ioff) {
                             const int ii =      i*rr.x  + ioff;
                             Real tmp = -dtdx*f(ii,jj,kk,n);
-#ifdef _OPENMP
-#pragma omp atomic
-#endif
-                            *dp += tmp;
+                            HostDevice::Atomic::Add(dp, tmp);
                         }
                     }
                 }
@@ -146,10 +141,7 @@ void yafluxreg_fineadd (Box const& bx, Array4<Real> const& d, Array4<Real const>
                         for (int ioff = 0; ioff < rr.x; ++ioff) {
                             const int ii =      i*rr.x  + ioff;
                             Real tmp = dtdx*f(ii,jj,kk,n);
-#ifdef _OPENMP
-#pragma omp atomic
-#endif
-                            *dp += tmp;
+                            HostDevice::Atomic::Add(dp, tmp);
                         }
                     }
                 }
@@ -170,10 +162,7 @@ void yafluxreg_fineadd (Box const& bx, Array4<Real> const& d, Array4<Real const>
                         for (int ioff = 0; ioff < rr.x; ++ioff) {
                             const int ii =      i*rr.x  + ioff;
                             Real tmp = -dtdx*f(ii,jj,kk,n);
-#ifdef _OPENMP
-#pragma omp atomic
-#endif
-                            *dp += tmp;
+                            HostDevice::Atomic::Add(dp, tmp);
                         }
                     }
                 }
@@ -194,10 +183,7 @@ void yafluxreg_fineadd (Box const& bx, Array4<Real> const& d, Array4<Real const>
                         for (int ioff = 0; ioff < rr.x; ++ioff) {
                             const int ii =      i*rr.x  + ioff;
                             Real tmp = dtdx*f(ii,jj,kk,n);
-#ifdef _OPENMP
-#pragma omp atomic
-#endif
-                                *dp += tmp;
+                            HostDevice::Atomic::Add(dp, tmp);
                         }
                     }
                 }

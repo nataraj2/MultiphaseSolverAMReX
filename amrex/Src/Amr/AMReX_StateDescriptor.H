@@ -1,26 +1,30 @@
 
 #ifndef AMREX_StateDescriptor_H_
 #define AMREX_StateDescriptor_H_
-
-#include <utility>
-#include <memory>
+#include <AMReX_Config.H>
 
 #include <AMReX_Array.H>
 #include <AMReX_Vector.H>
 #include <AMReX_REAL.H>
 #include <AMReX_Box.H>
 #include <AMReX_PhysBCFunct.H>
+#include <AMReX_Interpolater.H>
+#include <AMReX_MFInterpolater.H>
+#ifdef AMREX_USE_EB
+#include <AMReX_EBInterpolater.H>
+#include <AMReX_EBMFInterpolater.H>
+#endif
+
+#include <utility>
+#include <memory>
 
 namespace amrex {
 
-typedef void (*BndryFuncFabDefault) (Box const& bx, FArrayBox& data,
-                                     const int dcomp, const int numcomp,
-                                     Geometry const& geom, const Real time,
-                                     const Vector<BCRec>& bcr, const int bcomp,
-                                     const int scomp);
-
-class Interpolater;
-
+  typedef std::function<void(Box const& bx, FArrayBox& data,
+                             const int dcomp, const int numcomp,
+                             Geometry const& geom, const Real time,
+                             const Vector<BCRec>& bcr, const int bcomp,
+                             const int scomp)> BndryFuncFabDefault;
 
 /**
 * \brief Attributes of StateData.
@@ -81,23 +85,23 @@ public:
         */
         virtual ~BndryFunc ();
 
-	/**
-	* Fill boundary cells using "regular" function.
-    *
-	* \param data
-	* \param lo
-	* \param hi
-	* \param dom_lo
-	* \param dom_hi
-	* \param dx
-	* \param grd_lo
-	* \param time
-	* \param bc
-	*/
-	virtual void operator () (Real* data, const int* lo, const int* hi,
-				  const int* dom_lo, const int* dom_hi,
-				  const Real* dx, const Real* grd_lo,
-				  const Real* time, const int* bc) const;
+        /**
+        * Fill boundary cells using "regular" function.
+        *
+        * \param data
+        * \param lo
+        * \param hi
+        * \param dom_lo
+        * \param dom_hi
+        * \param dx
+        * \param grd_lo
+        * \param time
+        * \param bc
+        */
+        virtual void operator () (Real* data, const int* lo, const int* hi,
+                                  const int* dom_lo, const int* dom_hi,
+                                  const Real* dx, const Real* grd_lo,
+                                  const Real* time, const int* bc) const;
 
         /**
         * \brief Fill boundary cells using "group" function.
@@ -124,11 +128,11 @@ public:
                                   const Vector<BCRec>& bcr, const int bcomp,
                                   const int scomp) const;
 
-        bool RunOnGPU () const noexcept { return m_run_on_gpu; }
+        virtual bool RunOnGPU () const noexcept { return m_run_on_gpu; }
 
         void setRunOnGPU (bool b) noexcept { m_run_on_gpu = b; }
 
-        bool hasFabVersion () const noexcept { return m_funcfab != nullptr; }
+        virtual bool hasFabVersion () const noexcept { return m_funcfab != nullptr; }
 
     private:
 
@@ -162,7 +166,7 @@ public:
                      int           ident,
                      int           nextra,
                      int           num_comp,
-                     Interpolater* interp,
+                     InterpBase*   interp,
                      bool          extrap = false,
                      bool          store_in_checkpoint = true);
 
@@ -172,7 +176,7 @@ public:
     ~StateDescriptor ();
 
     /**
-    * \brief Define the data members if constructed with default construtor.
+    * \brief Define the data members if constructed with default constructor.
     *
     * \param btyp
     * \param ttyp
@@ -188,7 +192,7 @@ public:
                  int           ident,
                  int           nextra,
                  int           num_comp,
-                 Interpolater* interp,
+                 InterpBase*   interp,
                  bool          extrap = false,
                  bool          store_in_checkpoint = true);
 
@@ -207,7 +211,7 @@ public:
                        const std::string& nm,
                        const BCRec&       bc,
                        const BndryFunc&   func,
-                       Interpolater*      interp = 0,
+                       InterpBase*        interp = 0,
                        int                max_map_start_comp = -1,
                        int                min_map_end_comp   = -1);
 
@@ -219,15 +223,15 @@ public:
     * \param bc
     * \param func
     * \param interp
-    * \param master_or_slave
+    * \param primary_or_secondary
     * \param groupsize
     */
     void setComponent (int                comp,
                        const std::string& nm,
                        const BCRec&       bc,
                        const BndryFunc&   func,
-                       Interpolater*      interp,
-                       bool               master_or_slave,
+                       InterpBase*        interp,
+                       bool               primary_or_secondary,
                        int                groupsize);
 
     /**
@@ -256,10 +260,10 @@ public:
     * \param min_end_comp
     */
     void setUpMaps (int&                use_default_map,
-                    const Interpolater* default_map,
+                    const InterpBase*   default_map,
                     int                 start_comp,
                     int                 num_comp,
-                    Interpolater**&     maps,
+                    InterpBase**&       maps,
                     int&                nmaps,
                     int*&               map_start_comp,
                     int*&               map_num_comp,
@@ -275,7 +279,7 @@ public:
     * \param max_start_comp
     * \param min_end_comp
     */
-    void cleanUpMaps (Interpolater**& maps,
+    void cleanUpMaps (InterpBase**&   maps,
                       int*&           map_start_comp,
                       int*&           map_num_comp,
                       int*&           max_start_comp,
@@ -315,14 +319,14 @@ public:
     /**
     * \brief Returns the interpolater.
     */
-    Interpolater* interp () const noexcept;
+    InterpBase* interp () const noexcept;
 
     /**
     * \brief Returns the interpolater of specified component.
     *
     * \param i
     */
-    Interpolater* interp (int i) const noexcept;
+    InterpBase* interp (int i) const noexcept;
 
     /**
     * \brief Returns the name of specified component.
@@ -380,7 +384,7 @@ public:
     */
     bool store_in_checkpoint () const noexcept;
 
-    bool master (int i) const noexcept { return m_master[i]; }
+    bool primary (int i) const noexcept { return m_primary[i]; }
 
     int groupsize (int i) const noexcept { return m_groupsize[i]; }
 
@@ -406,20 +410,20 @@ private:
     int                id;           //!< Unique id
     int                ncomp;        //!< Number of components
     int                ngrow;        //!< Grow factor
-    Interpolater*      mapper;       //!< Default interpolator
+    InterpBase*        mapper;       //!< Default interpolator
     bool               m_extrap;     //!< Can extrapolate in time?
     bool               m_store_in_checkpoint;     //!< Should store this in the checkpoint file?
     Vector<std::string> names;        //!< Printable names of components
     Vector<BCRec>       bc;           //!< Array of bndry types for entire level
     Vector<std::unique_ptr<BndryFunc> >  bc_func;      //!< Array of pointers to bndry fill functions
-    Vector<int>         m_master;     //!< Are we a master or slave? (true or false)
-    Vector<int>         m_groupsize;     //!< Groupsize if we're a master
+    Vector<int>         m_primary;     //!< Are we a primary or secondary? (true or false)
+    Vector<int>         m_groupsize;     //!< Groupsize if we're a primary
 
     /**
     * \brief If mapper_comp[icomp] != 0, that map is used instead of mapper
     * when interpolating icomp; otherwise, mapper is used.
     */
-    Vector<Interpolater*> mapper_comp;
+    Vector<InterpBase*> mapper_comp;
 
     /**
     * \brief For component icomp, max_map_start_comp[icomp] and
@@ -437,8 +441,8 @@ private:
     static int bf_ext_dir_threadsafe;
 
     static bool bf_thread_safety (const int* lo,const int* hi,
-				  const int* dom_lo, const int* dom_hi,
-				  const int* bc, int ng);
+                                  const int* dom_lo, const int* dom_hi,
+                                  const int* bc, int ng);
 };
 
 /**
@@ -486,7 +490,7 @@ public:
                         StateDescriptor::TimeCenter ttyp,
                         int                         nextra,
                         int                         num_comp,
-                        Interpolater*               interp,
+                        InterpBase*                 interp,
                         bool                        extrap = false,
                         bool                        store_in_checkpoint = true);
 
@@ -520,7 +524,7 @@ public:
                        const std::string&                nm,
                        const BCRec&                      bc,
                        const StateDescriptor::BndryFunc& func,
-                       Interpolater*                     interp = 0,
+                       InterpBase*                       interp = 0,
                        int                               max_map_start_comp = -1,
                        int                               min_map_end_comp   = -1);
 
@@ -539,7 +543,7 @@ public:
                        const Vector<std::string>&         nm,
                        const Vector<BCRec>&               bc,
                        const StateDescriptor::BndryFunc& func,
-                       Interpolater*                     interp = 0);
+                       InterpBase*                       interp = 0);
     /**
     * Returns StateDescriptor at index k.
     */

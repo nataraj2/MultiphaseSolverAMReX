@@ -1,0 +1,112 @@
+module mod_compute_vortmag
+
+  use amrex_base_module
+  use amrex_amr_module
+  use amr_data_module
+  use fillpatch_module
+
+  implicit none
+
+contains
+
+subroutine compute_vortmag
+
+    implicit none
+
+    integer :: ilev
+    integer :: borlo(4), borhi(4), clo(4), chi(4)
+    type(amrex_box) :: bx
+    type(amrex_mfiter) :: mfi
+    real(amrex_real), contiguous, dimension(:,:,:,:), pointer :: Uptr,Vptr,Wptr,vortmagptr
+    integer :: nlevs
+    integer, parameter :: ngrow = 3
+    type(amrex_multifab) :: Uborder,Vborder,Wborder
+    real(amrex_real) :: time
+	
+    time=0.0d0
+
+    nlevs = amrex_get_finest_level()
+
+    do ilev = 0, nlevs
+        call amrex_multifab_build(vortmagmfab(ilev), phi_new(ilev)%ba, phi_new(ilev)%dm, 1, 0)
+        call amrex_multifab_build(Umfab(ilev), phi_new(ilev)%ba, phi_new(ilev)%dm, 1, 0)
+        call amrex_multifab_build(Vmfab(ilev), phi_new(ilev)%ba, phi_new(ilev)%dm, 1, 0)
+        call amrex_multifab_build(Wmfab(ilev), phi_new(ilev)%ba, phi_new(ilev)%dm, 1, 0)
+    enddo
+
+    do ilev = 0, nlevs
+
+       call Umfab(ilev) % copy(phi_new(ilev), 2, 1, 1, 0)
+       call Umfab(ilev) % divide(phi_new(ilev), 1, 1, 1, 0)
+
+       call Vmfab(ilev) % copy(phi_new(ilev), 3, 1, 1, 0)
+       call Vmfab(ilev) % divide(phi_new(ilev), 1, 1, 1, 0)
+
+       call Wmfab(ilev) % copy(phi_new(ilev), 4, 1, 1, 0)
+       call Wmfab(ilev) % divide(phi_new(ilev), 1, 1, 1, 0)
+
+
+       call amrex_multifab_build(Uborder, phi_new(ilev)%ba, phi_new(ilev)%dm, 1, ngrow)
+       call fillpatchsingle (ilev, time, Uborder, Umfab, Umfab)
+
+       call amrex_multifab_build(Vborder, phi_new(ilev)%ba, phi_new(ilev)%dm, 1, ngrow)
+       call fillpatchsingle (ilev, time, Vborder, Vmfab, Vmfab)
+
+       call amrex_multifab_build(Wborder, phi_new(ilev)%ba, phi_new(ilev)%dm, 1, ngrow)
+       call fillpatchsingle (ilev, time, Wborder, Wmfab, Wmfab)
+      
+       call amrex_mfiter_build(mfi, phi_new(ilev), tiling=.true.)
+       do while (mfi%next())
+          bx = mfi%tilebox()
+          vortmagptr      => vortmagmfab(ilev)%dataptr(mfi)
+ 	  Uptr 	       => Uborder%dataptr(mfi)
+ 	  Vptr 	       => Vborder%dataptr(mfi)
+ 	  Wptr 	       => Wborder%dataptr(mfi)
+	  borlo    = lbound(Uptr)
+	  borhi    = ubound(Uptr)
+	  clo    = lbound(vortmagptr)
+	  chi    = ubound(vortmagptr)
+
+          call vortmag(ilev, bx%lo, bx%hi, Uptr, Vptr, Wptr, borlo, borhi, vortmagptr, clo, chi, amrex_geom(ilev)%dx, amrex_problo)
+
+       end do
+       call amrex_mfiter_destroy(mfi)
+     
+       call amrex_multifab_destroy(Uborder)
+       call amrex_multifab_destroy(Vborder)
+       call amrex_multifab_destroy(Wborder)
+
+    end do
+
+end subroutine compute_vortmag
+
+subroutine vortmag(level, lo, hi, U, V, W, borlo, borhi, vortmagnitude, clo, chi, dx, prob_lo)
+
+  implicit none
+  integer, intent(in) :: level, lo(3), hi(3), borlo(3), borhi(3), clo(3), chi(3)
+  double precision, dimension(borlo(1):borhi(1),borlo(2):borhi(2),borlo(3):borhi(3)) :: U,V,W
+  double precision, dimension(clo(1):chi(1),clo(2):chi(2),clo(3):chi(3)) :: vortmagnitude
+
+  double precision, intent(in) :: dx(3), prob_lo(3)
+  integer          :: i,j,k
+  double precision :: dUdy,dUdz,dVdx,dVdz,dWdx,dWdy
+
+  do k=lo(3),hi(3)
+     do j=lo(2),hi(2)
+        do i=lo(1),hi(1)
+	   dUdy = (U(i,j+1,k)-U(i,j-1,k))/(2.0d0*dx(2))
+    	   dUdz = (U(i,j,k+1)-U(i,j,k-1))/(2.0d0*dx(3))
+	   dVdx = (V(i+1,j,k)-V(i-1,j,k))/(2.0d0*dx(1))
+	   dVdz = (V(i,j,k+1)-V(i,j,k-1))/(2.0d0*dx(3))
+	   dWdx = (W(i+1,j,k)-W(i-1,j,k))/(2.0d0*dx(1))
+	   dWdy = (W(i,j+1,k)-W(i,j-1,k))/(2.0d0*dx(2))
+	   vortmagnitude(i,j,k) = dsqrt((dWdy-dVdz)**2+(dUdz-dWdx)**2+(dVdx-dUdy)**2) 
+        end do
+     end do
+  end do
+
+
+
+end subroutine vortmag
+ 
+end module mod_compute_vortmag

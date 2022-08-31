@@ -1,19 +1,29 @@
 
-#ifndef BL_VISMF_H
-#define BL_VISMF_H
+#ifndef AMREX_VISMF_H_
+#define AMREX_VISMF_H_
+#include <AMReX_Config.H>
 
-#include <iosfwd>
-#include <string>
-#include <fstream>
-
-#include <AMReX_REAL.H>
+#include <AMReX_AsyncOut.H>
+#include <AMReX_BLProfiler.H>
 #include <AMReX_FabArray.H>
 #include <AMReX_FArrayBox.H>
 #include <AMReX_FabConv.H>
+#include <AMReX_NFiles.H>
+#include <AMReX_ParallelDescriptor.H>
+#include <AMReX_VisMFBuffer.H>
+
+#include <fstream>
+#include <iostream>
+#include <sstream>
+#include <deque>
+#include <map>
+#include <numeric>
+#include <string>
+#include <type_traits>
 
 namespace amrex {
 
-class NFilesIter;
+class IArrayBox;
 
 /**
 * \brief File I/O for FabArray<FArrayBox>.
@@ -21,18 +31,9 @@ class NFilesIter;
 */
 
 class VisMF
+    : public VisMFBuffer
 {
 public:
-    //! We try to do I/O with buffers of this size.
-    enum { IO_Buffer_Size = 262144 * 8 };
-    //! The type of a char buffer required by [p]setbuf().
-#ifdef BL_SETBUF_SIGNED_CHAR
-    typedef signed char Setbuf_Char_Type;
-#else
-    typedef char Setbuf_Char_Type;
-#endif
-    //! A simple character buffer for setbuf() usage.
-    typedef Vector<Setbuf_Char_Type> IO_Buffer;
     /**
     * \brief How we write out FabArray<FArrayBox>s.
     * These are deprecated, we always use NFiles.
@@ -53,34 +54,38 @@ public:
         //! The default constructor -- null out all fields.
         FabOnDisk ();
         //! Constructor that sets the two values.
-        FabOnDisk (const std::string& name, long offset);
+        FabOnDisk (const std::string& name, Long offset);
         //! The two data values in a FabOnDisk structure.
         std::string m_name; //!< The name of file containing the FAB.
-        long    m_head;     //!< Offset to start of FAB in file.
+        Long    m_head;     //!< Offset to start of FAB in file.
     };
     //! An on-disk FabArray<FArrayBox> contains this info in a header file.
     struct Header
     {
         //! The versions of the FabArray<FArrayBox> Header code.
         enum Version {
-	  Undefined_v1           = 0,  //!< ---- undefined
-	  Version_v1             = 1,  //!< ---- auto converting version with headers
-	                               //!< ---- for each fab in the data files and
-				       //!< ---- min and max values for each fab in the header
-	  NoFabHeader_v1         = 2,  //!< ---- no fab headers, no fab mins or maxes
-	  NoFabHeaderMinMax_v1   = 3,  //!< ---- no fab headers,
-				       //!< ---- min and max values for each fab in the header
-	  NoFabHeaderFAMinMax_v1 = 4   //!< ---- no fab headers, no fab mins or maxes,
-				       //!< ---- min and max values for each FabArray in the header
-	};
+            Undefined_v1           = 0,  //!< ---- undefined
+            Version_v1             = 1,  //!< ---- auto converting version with headers
+                                         //!< ---- for each fab in the data files and
+                                         //!< ---- min and max values for each fab in the header
+            NoFabHeader_v1         = 2,  //!< ---- no fab headers, no fab mins or maxes
+            NoFabHeaderMinMax_v1   = 3,  //!< ---- no fab headers,
+                                         //!< ---- min and max values for each fab in the header
+            NoFabHeaderFAMinMax_v1 = 4   //!< ---- no fab headers, no fab mins or maxes,
+                                         //!< ---- min and max values for each FabArray in the header
+        };
         //! The default constructor.
         Header ();
         //! Construct from a FabArray<FArrayBox>.
         Header (const FabArray<FArrayBox>& fafab, VisMF::How how, Version version = Version_v1,
-		bool calcMinMax = true);
-	//! Calculate the min and max arrays
-	void CalculateMinMax(const FabArray<FArrayBox>& fafab,
-			     int procToWrite = ParallelDescriptor::IOProcessorNumber());
+                bool calcMinMax = true, MPI_Comm = ParallelDescriptor::Communicator());
+
+        Header (Header&& rhs) noexcept = default;
+
+        //! Calculate the min and max arrays
+        void CalculateMinMax(const FabArray<FArrayBox>& fafab,
+                             int procToWrite = ParallelDescriptor::IOProcessorNumber(),
+                             MPI_Comm = ParallelDescriptor::Communicator());
         //
         // The data.
         //
@@ -90,26 +95,26 @@ public:
         IntVect              m_ngrow; //!< The number of ghost cells in MF.
         BoxArray             m_ba;    //!< The BoxArray of the MF.
         Vector< FabOnDisk >   m_fod;   //!< FabOnDisk info for contained FABs.
-	//
-	// These are not defined if they are not in the header
-	//
+        //
+        // These are not defined if they are not in the header
+        //
         Vector< Vector<Real> > m_min;   //!< The min()s of each component of FABs.  [findex][comp]
         Vector< Vector<Real> > m_max;   //!< The max()s of each component of FABs.  [findex][comp]
         Vector<Real>          m_famin; //!< The min()s of each component of the FabArray.  [comp]
         Vector<Real>          m_famax; //!< The max()s of each component of the FabArray.  [comp]
-	RealDescriptor       m_writtenRD;
+        RealDescriptor       m_writtenRD;
     };
 
     //! This structure is used to store the read order for each FabArray file
     struct FabReadLink
     {
         int rankToRead;
-	int faIndex;
-	long fileOffset;
-	Box box;
+        int faIndex;
+        Long fileOffset;
+        Box box;
 
-	FabReadLink();
-	FabReadLink(int ranktoread, int faindex, long fileoffset, const Box &b);
+        FabReadLink();
+        FabReadLink(int ranktoread, int faindex, Long fileoffset, const Box &b);
     };
 
     //! This structure is used to store file ifstreams that remain open
@@ -117,11 +122,11 @@ public:
     {
         std::ifstream   *pstr;
         std::streampos   currentPosition;
-	bool             isOpen;
-	VisMF::IO_Buffer ioBuffer;
+        bool             isOpen;
+        VisMF::IO_Buffer ioBuffer;
 
-	PersistentIFStream();
-	~PersistentIFStream();
+        PersistentIFStream();
+        ~PersistentIFStream();
     };
 
     /**
@@ -174,10 +179,16 @@ public:
     * one-half the average of the min and max over the valid region
     * of each contained FAB.
     */
-    static long Write (const FabArray<FArrayBox> &fafab,
+    static Long Write (const FabArray<FArrayBox> &fafab,
                        const std::string& name,
                        VisMF::How         how = NFiles,
                        bool               set_ghost = false);
+
+    static void AsyncWrite (const FabArray<FArrayBox>& mf, const std::string& mf_name,
+                            bool valid_cells_only = false);
+    static void AsyncWrite (FabArray<FArrayBox>&& mf, const std::string& mf_name,
+                            bool valid_cells_only = false);
+
     /**
     * \brief Write only the header-file corresponding to FabArray<FArrayBox> to
     * disk without the corresponding FAB data. This writes BoxArray information
@@ -185,7 +196,7 @@ public:
     * when the FAB data is not needed. Returns the total number of bytes written
     * on this processor.
     */
-    static long WriteOnlyHeader (const FabArray<FArrayBox> & mf,
+    static Long WriteOnlyHeader (const FabArray<FArrayBox> & mf,
                                  const std::string         & mf_name,
                                  VisMF::How                  how = NFiles);
     //! this will remove nfiles associated with name and the header
@@ -202,33 +213,31 @@ public:
     */
     static void Read (FabArray<FArrayBox> &fafab,
                       const std::string &name,
-		      const char *faHeader = nullptr,
-		      int coordinatorProc = ParallelDescriptor::IOProcessorNumber(),
-		      int allow_empty_mf = 0);
+                      const char *faHeader = nullptr,
+                      int coordinatorProc = ParallelDescriptor::IOProcessorNumber(),
+                      int allow_empty_mf = 0);
 
     //! Does FabArray exist?
     static bool Exist (const std::string &name);
 
     //! Read only the header of a FabArray, header will be resized here.
     static void ReadFAHeader (const std::string &fafabName,
-		              Vector<char> &header);
+                              Vector<char> &header);
 
     //! Check if the multifab is ok, false is returned if not ok
     static bool Check (const std::string &name);
     //! The file offset of the passed ostream.
-    static long FileOffset (std::ostream& os);
+    static Long FileOffset (std::ostream& os);
     //! Read the entire fab (all components).
-    FArrayBox* readFAB (int                fabIndex,
-                        const std::string& fafabName);
+    FArrayBox* readFAB (int fabIndex, const std::string& fafabName);
     //! Read the specified fab component.
-    FArrayBox* readFAB (int fabIndex,
-                        int icomp);
+    FArrayBox* readFAB (int fabIndex, int icomp);
 
     static int  GetNOutFiles ();
-    static void SetNOutFiles (int noutfiles);
+    static void SetNOutFiles (int newoutfiles, MPI_Comm comm = ParallelDescriptor::Communicator());
 
     static int  GetMFFileInStreams ()  { return nMFFileInStreams; }
-    static void SetMFFileInStreams (int nstreams);
+    static void SetMFFileInStreams (int nstreams, MPI_Comm comm = ParallelDescriptor::Communicator());
 
     static int GetVerbose ()       { return verbose; }
     static void SetVerbose (int v) { verbose = v; }
@@ -261,11 +270,8 @@ public:
     static bool GetUseDynamicSetSelection () { return useDynamicSetSelection; }
     static void SetUseDynamicSetSelection (bool usedss) { useDynamicSetSelection = usedss; }
 
-    static long GetIOBufferSize () { return ioBufferSize; }
-    static void SetIOBufferSize (long iobuffersize) {
-      BL_ASSERT(iobuffersize > 0);
-      ioBufferSize = iobuffersize;
-    }
+    static std::string DirName (const std::string& filename);
+    static std::string BaseName (const std::string& filename);
 
     static void Initialize ();
     static void Finalize ();
@@ -280,19 +286,23 @@ private:
     static FabOnDisk Write (const FArrayBox&   fab,
                             const std::string& filename,
                             std::ostream&      os,
-                            long&              bytes);
+                            Long&              bytes);
 
-    static long WriteHeader (const std::string &fafab_name,
+    static Long WriteHeaderDoit (const std::string &fafab_name,
+                                 VisMF::Header const &hdr);
+
+    static Long WriteHeader (const std::string &fafab_name,
                              VisMF::Header     &hdr,
-			     int procToWrite = ParallelDescriptor::IOProcessorNumber());
+                             int procToWrite = ParallelDescriptor::IOProcessorNumber(),
+                             MPI_Comm comm = ParallelDescriptor::Communicator());
 
     //! fileNumbers must be passed in for dynamic set selection [proc]
     static void FindOffsets (const FabArray<FArrayBox> &fafab,
-			     const std::string &fafab_name,
+                             const std::string &fafab_name,
                              VisMF::Header &hdr,
-			     bool groupSets,
-			     VisMF::Header::Version whichVersion,
-			     NFilesIter &nfi);
+                             VisMF::Header::Version whichVersion,
+                             NFilesIter &nfi,
+                             MPI_Comm comm = ParallelDescriptor::Communicator());
     /**
     * \brief Make a new FAB from a fab in a FabArray<FArrayBox> on disk.
     * The returned *FAB will have either one component filled from
@@ -303,16 +313,16 @@ private:
     static FArrayBox *readFAB (int                fabIndex,
                                const std::string &fafab_name,
                                const Header      &hdr,
-			       int                whichComp = -1);
+                               int                whichComp = -1);
     //! Read the whole FAB into fafab[fabIndex]
     static void readFAB (FabArray<FArrayBox> &fafab,
-			 int                fabIndex,
-			 const std::string &fafab_name,
-			 const Header&      hdr);
+                         int                fabIndex,
+                         const std::string &fafab_name,
+                         const Header&      hdr);
 
-    static std::string DirName (const std::string& filename);
+    static void AsyncWriteDoit (const FabArray<FArrayBox>& mf, const std::string& mf_name,
+                                bool is_rvalue, bool valid_cells_only);
 
-    static std::string BaseName (const std::string& filename);
     //! Name of the FabArray<FArrayBox>.
     std::string m_fafabname;
     //! The VisMF header as read from disk.
@@ -324,24 +334,22 @@ private:
     * be closed when not needed with CloseAllStreams.
     * ~VisMF also closes them.  [filename, pifs]
     */
-    static std::map<std::string, VisMF::PersistentIFStream> persistentIFStreams;
+    static AMREX_EXPORT std::map<std::string, VisMF::PersistentIFStream> persistentIFStreams;
     //! The number of files to write for a FabArray<FArrayBox>.
-    static int nOutFiles;
-    static int nMFFileInStreams;
+    static AMREX_EXPORT int nOutFiles;
+    static AMREX_EXPORT int nMFFileInStreams;
 
-    static int verbose;
-    static VisMF::Header::Version currentVersion;
-    static bool groupSets;
-    static bool setBuf;
-    static bool useSingleRead;
-    static bool useSingleWrite;
-    static bool checkFilePositions;
-    static bool usePersistentIFStreams;
-    static bool useSynchronousReads;
-    static bool useDynamicSetSelection;
-    static bool allowSparseWrites;
-
-    static long ioBufferSize;   //!< ---- the settable buffer size
+    static AMREX_EXPORT int verbose;
+    static AMREX_EXPORT VisMF::Header::Version currentVersion;
+    static AMREX_EXPORT bool groupSets;
+    static AMREX_EXPORT bool setBuf;
+    static AMREX_EXPORT bool useSingleRead;
+    static AMREX_EXPORT bool useSingleWrite;
+    static AMREX_EXPORT bool checkFilePositions;
+    static AMREX_EXPORT bool usePersistentIFStreams;
+    static AMREX_EXPORT bool useSynchronousReads;
+    static AMREX_EXPORT bool useDynamicSetSelection;
+    static AMREX_EXPORT bool allowSparseWrites;
 };
 
 //! Write a FabOnDisk to an ostream in ASCII.
@@ -356,6 +364,380 @@ std::istream& operator>> (std::istream& is, Vector<VisMF::FabOnDisk>& fa);
 std::ostream& operator<< (std::ostream& os, const VisMF::Header& hd);
 //! Read a VisMF::Header from an istream.
 std::istream& operator>> (std::istream& is, VisMF::Header& hd);
+
+/**
+ * \brief Write iMultiFab/FabArray<IArrayBox>
+ *
+ *  This writes an iMultiFab/FabArray<IArrayBox> to files on disk, including
+ *  a clear text file NAME_H and binary files NAME_D_00000 etc.
+ *
+ * \param fa is the iMultiFab to be written.
+ * \param name is the base name for the files.
+ */
+template <typename FAB>
+// This function does work for MultiFab, but let's disable it to avoid confusion.
+std::enable_if_t<std::is_same<FAB,IArrayBox>::value>
+Write (const FabArray<FAB>& fa, const std::string& name)
+{
+    BL_PROFILE("Write(FabArray)");
+    AMREX_ASSERT(name.back() != '/');
+
+    auto data_descriptor = FAB::getDataDescriptor();
+    int data_bytes = data_descriptor->numBytes();
+
+    bool useSparseFPP = false;
+    const Vector<int> &pmap = fa.DistributionMap().ProcessorMap();
+    std::set<int> procsWithData;
+    Vector<int> procsWithDataVector;
+    for(int i = 0; i < pmap.size(); ++i) {
+        procsWithData.insert(pmap[i]);
+    }
+    const int nOutFiles = VisMF::GetNOutFiles();
+    if (static_cast<int>(procsWithData.size()) < nOutFiles) {
+        useSparseFPP = true;
+        for (auto i : procsWithData) {
+            procsWithDataVector.push_back(i);
+        }
+    }
+
+    std::string filePrefix = name + "_D_";
+
+    NFilesIter nfi(nOutFiles, filePrefix, VisMF::GetGroupSets(), VisMF::GetSetBuf());
+
+    if (useSparseFPP) {
+        nfi.SetSparseFPP(procsWithDataVector);
+    } else {
+        nfi.SetDynamic();
+    }
+
+    const auto &fio = FAB::getFABio();
+
+    for ( ; nfi.ReadyToWrite(); ++nfi) {
+        for(MFIter mfi(fa); mfi.isValid(); ++mfi) {
+            const FAB &fab = fa[mfi];
+            {
+                std::stringstream hss;
+                fio.write_header(hss, fab, fab.nComp());
+                auto hLength = static_cast<std::streamoff>(hss.tellp());
+                auto tstr = hss.str();
+                nfi.Stream().write(tstr.c_str(), hLength);
+                nfi.Stream().flush();
+            }
+            auto const* fabdata = fab.dataPtr();
+#ifdef AMREX_USE_GPU
+            std::unique_ptr<FAB> hostfab;
+            if (fab.arena()->isManaged() || fab.arena()->isDevice()) {
+                hostfab = std::make_unique<FAB>(fab.box(), fab.nComp(), The_Pinned_Arena());
+                Gpu::dtoh_memcpy_async(hostfab->dataPtr(), fab.dataPtr(),
+                                       fab.size()*sizeof(typename FAB::value_type));
+                Gpu::streamSynchronize();
+                fabdata = hostfab->dataPtr();
+            }
+#endif
+            Long writeDataItems = fab.box().numPts() * fa.nComp();
+            Long writeDataSize = writeDataItems * data_bytes;
+            nfi.Stream().write((char *) fabdata, writeDataSize);
+            nfi.Stream().flush();
+        }
+    }
+
+    int coordinatorProc = ParallelDescriptor::IOProcessorNumber();
+    if (nfi.GetDynamic()) {
+        coordinatorProc = nfi.CoordinatorProc();
+    }
+
+    if (ParallelDescriptor::MyProc() == coordinatorProc) {
+        std::string header_file_name = name + "_H";
+        VisMFBuffer::IO_Buffer io_buffer(VisMFBuffer::GetIOBufferSize());
+        std::ofstream ofs;
+        ofs.rdbuf()->pubsetbuf(io_buffer.dataPtr(), io_buffer.size());
+        ofs.open(header_file_name.c_str(), std::ios::out | std::ios::trunc);
+        if (!ofs.good()) {
+            amrex::FileOpenFailed(header_file_name);
+        }
+
+        ofs << "amrex::FabArray<" << FAB::getClassName() << "> v1.0\n";
+        ofs << fa.nComp() << '\n';
+        ofs << fa.nGrowVect() << '\n';
+        fa.boxArray().writeOn(ofs);
+        ofs << '\n';
+
+        const DistributionMapping& dm = fa.DistributionMap();
+        int nfabs = fa.boxArray().size();
+        int nFiles = NFilesIter::ActualNFiles(nOutFiles);
+        int nprocs = ParallelDescriptor::NProcs();
+
+        Vector<Long> fabBytes(nfabs, 0);
+        std::map<int, Vector<int> > rankBoxOrder;
+        for (int i = 0; i < nfabs; ++i) {
+            std::stringstream hss;
+            FAB tmp(fa.fabbox(i), fa.nComp(), false);
+            fio.write_header(hss, tmp, tmp.nComp());
+            // Size includes header and data
+            fabBytes[i] = static_cast<std::streamoff>(hss.tellp()) + tmp.size() * data_bytes;
+            rankBoxOrder[dm[i]].push_back(i);
+        }
+
+        Vector<int> fileNumbers;
+        if (nfi.GetDynamic()) {
+            fileNumbers = nfi.FileNumbersWritten();
+        } else if (nfi.GetSparseFPP()) {
+            // if sparse, write to (file number = rank)
+            fileNumbers.resize(nprocs);
+            std::iota(fileNumbers.begin(), fileNumbers.end(), 0);
+        } else {
+            fileNumbers.resize(nprocs);
+            for (int i = 0; i < nprocs; ++i) {
+                fileNumbers[i] = NFilesIter::FileNumber(nFiles, i, VisMF::GetGroupSets());
+            }
+        }
+
+        Vector<VisMF::FabOnDisk> fod(nfabs);
+
+        const Vector< Vector<int> > &fileNumbersWriteOrder = nfi.FileNumbersWriteOrder();
+        for (auto const& rv : fileNumbersWriteOrder) {
+            Long currentOffset = 0;
+            for (auto rank : rv) {
+                auto rbo_it = rankBoxOrder.find(rank);
+                if (rbo_it != rankBoxOrder.end()) {
+                    Vector<int> const& index = rbo_it->second;
+                    int whichFileNumber = fileNumbers[rank];
+                    std::string const& whichFileName =
+                        VisMF::BaseName(NFilesIter::FileName(whichFileNumber, filePrefix));
+                    for (int i : index) {
+                        fod[i].m_name = whichFileName;
+                        fod[i].m_head = currentOffset;
+                        currentOffset += fabBytes[i];
+                    }
+                }
+            }
+        }
+        ofs << fod;
+    }
+}
+
+namespace detail {
+template <typename FAB>
+void read_fab (FAB& fab, VisMF::FabOnDisk const& fod, std::string const& name)
+{
+    std::string fullname = VisMF::DirName(name);
+    fullname += fod.m_name;
+    VisMFBuffer::IO_Buffer io_buffer(VisMFBuffer::GetIOBufferSize());
+    std::ifstream ifs;
+    ifs.rdbuf()->pubsetbuf(io_buffer.dataPtr(), io_buffer.size());
+    ifs.open(fullname.c_str(), std::ios::in | std::ios::binary);
+    if (!ifs.good()) {
+        amrex::FileOpenFailed(fullname);
+    }
+    ifs.seekg(fod.m_head, std::ios::beg);
+    fab.readFrom(ifs);
+}
+}
+
+/**
+ * \brief Read iMultiFab/FabArray<IArrayBox>
+ *
+ * This reads an iMultiFab/FabArray<IArrayBox> from disk.  If it has been
+ * fully defined, the BoxArray on the disk must match the BoxArray in the
+ * given iMultiFab/FabArray<IArrayBox> object.  If it is only constructed
+ * with the default constructor, the BoxArray on the disk will be used and a
+ * new DistributionMapping will be made.  When this funciton is used to
+ * restart a calculation from checkpoint files, one should use a fully
+ * defined iMultiFab/FabArray<IArrayBox> except for the first one in a
+ * series of iMultiFab/MultiFab objects that share the same
+ * BoxArray/DistributionMapping.  This will ensure that they share the same
+ * BoxArray/DistributionMapping after restart.
+ *
+ * \param fa is the iMultiFab.
+ * \param name is the base name for the files.
+ */
+template <typename FAB>
+// This function does work for MultiFab, but let's disable it to avoid confusion.
+std::enable_if_t<std::is_same<FAB,IArrayBox>::value>
+Read (FabArray<FAB>& fa, const std::string& name)
+{
+    BL_PROFILE("Read(FabArray)");
+    AMREX_ASSERT(name.back() != '/');
+
+    BoxArray ba;
+    int ncomp;
+    IntVect ngrow;
+    Vector<VisMF::FabOnDisk> fod;
+    {
+        std::string header_file_name = name + "_H";
+        Vector<char> header_file_chars;
+        ParallelDescriptor::ReadAndBcastFile(header_file_name, header_file_chars);
+        std::string header_file_string(header_file_chars.data());
+        std::stringstream ifs(header_file_string, std::istringstream::in);
+
+        std::string type, version;
+        ifs >> type >> version;
+        AMREX_ASSERT(type == "amrex::FabArray<amrex::IArrayBox>" ||
+                     type == "amrex::FabArray<amrex::FArrayBox>");
+        ifs >> ncomp;
+        ifs >> ngrow;
+        ba.readFrom(ifs);
+        ifs >> fod;
+    }
+
+    if (fa.empty()) {
+        fa.define(ba, DistributionMapping{ba}, ncomp, ngrow);
+    } else {
+        AMREX_ASSERT(amrex::match(ba, fa.boxArray()));
+    }
+
+#ifdef AMREX_USE_MPI
+    const int nopensperfile = VisMF::GetMFFileInStreams(); // # of concurrent readers per file
+    const int myproc = ParallelDescriptor::MyProc();
+    const int coordproc = ParallelDescriptor::IOProcessorNumber();
+
+    int nreqs = 0;
+    int allreadsindex = 0;
+    std::map<std::string, int> filenames; // <filename, allreadsindex>
+
+    const int nboxes = fa.size();
+    const auto& dm = fa.DistributionMap();
+    for (int i = 0; i < nboxes; ++i) {
+        if (myproc == dm[i]) {
+            ++nreqs;
+        }
+        if (myproc == coordproc) {
+            std::string const& fname = fod[i].m_name;
+            auto r =filenames.insert(std::make_pair(fname, allreadsindex));
+            if (r.second) {
+                ++allreadsindex;
+            }
+        }
+    }
+
+    const int readtag = ParallelDescriptor::SeqNum();
+    const int donetag = ParallelDescriptor::SeqNum();
+
+    if (myproc == coordproc) {
+        std::multiset<int> availablefiles;  // [whichFile]  supports multiple reads/file
+        Vector<std::map<int,std::map<Long,int> > > allreads; // [file]<proc,<seek,index>>
+
+        const int nfiles = filenames.size();
+        for (int i = 0; i < nfiles; ++i) {
+            for (int j = 0; j < nopensperfile; ++j) {
+                availablefiles.insert(i);
+            }
+        }
+        allreads.resize(nfiles);
+        for (int i = 0; i < nboxes; ++i) {
+            const auto whichproc = dm[i];
+            const auto iseekpos = fod[i].m_head;
+            std::string const& fname = fod[i].m_name;
+            auto filenamesiter = filenames.find(fname);
+            if (filenamesiter != filenames.end()) {
+                const int fi = filenamesiter->second;
+                allreads[fi][whichproc].insert(std::make_pair(iseekpos,i));
+            } else {
+                amrex::Error("Error in amrex::Read: filename not found "+fname);
+            }
+        }
+
+        int totalioreqs = nboxes;
+        int messtotal = 0;
+        int reqspending = 0;
+        int iopfileindex;
+        std::deque<int> iopreads;
+        std::set<int> busyprocs;
+        while (totalioreqs > 0) {
+            auto afilesiter = availablefiles.begin();
+            while (afilesiter != availablefiles.end()) {
+                const int fi = *afilesiter;
+                if (allreads[fi].empty()) {
+                    availablefiles.erase(fi);
+                    afilesiter = availablefiles.begin();
+                    continue;
+                }
+                auto whichread = allreads[fi].begin();
+                for ( ; whichread != allreads[fi].end(); ++whichread) {
+                    const int tryproc = whichread->first;
+                    if (busyprocs.find(tryproc) == busyprocs.end()) { // not busy
+                        busyprocs.insert(tryproc);
+                        Vector<int> vreads;
+                        vreads.reserve(whichread->second.size());
+                        for (auto const& kv : whichread->second) {
+                            vreads.push_back(kv.second);
+                        }
+                        if (tryproc == coordproc) {
+                            iopfileindex = fi;
+                            for (auto x : vreads) {
+                                iopreads.push_back(x);
+                            }
+                        } else {
+                            ParallelDescriptor::Send(vreads, tryproc, readtag);
+                            ++messtotal;
+                            ++reqspending;
+                        }
+                        availablefiles.erase(afilesiter);
+                        afilesiter = availablefiles.begin();
+                        break;
+                    }
+                }
+                if (whichread == allreads[fi].end()) {
+                    ++afilesiter;
+                } else {
+                    allreads[fi].erase(whichread);
+                }
+            }
+
+            while (!iopreads.empty()) {
+                int i = iopreads.front();
+                detail::read_fab(fa[i], fod[i], name);
+                --totalioreqs;
+                iopreads.pop_front();
+                if (iopreads.empty()) {
+                    availablefiles.insert(iopfileindex);
+                    busyprocs.erase(coordproc);
+                }
+                int doneflag;
+                MPI_Status status;
+                ParallelDescriptor::IProbe(MPI_ANY_SOURCE, donetag, doneflag, status);
+                if (doneflag) {
+                    break;
+                }
+            }
+
+            if (reqspending > 0) {
+                Vector<int> idone(2);
+                ParallelDescriptor::Message rmess = ParallelDescriptor::Recv(idone, MPI_ANY_SOURCE,
+                                                                             donetag);
+                const int i = idone[0];
+                const int procdone = rmess.pid();
+                totalioreqs -= idone[1];
+                --reqspending;
+                busyprocs.erase(procdone);
+                std::string const& fname = fod[i].m_name;
+                const int fi = filenames.find(fname)->second;
+                availablefiles.insert(fi);
+            }
+        }
+    } else {
+        Vector<int> recreads(nreqs, -1);
+        Vector<int> idone(2);
+        while (nreqs > 0) {
+            ParallelDescriptor::Message rmess = ParallelDescriptor::Recv(recreads, coordproc,
+                                                                         readtag);
+            const int nrmess = rmess.count();
+            for (int ir = 0; ir < nrmess; ++ir) {
+                int i = recreads[ir];
+                detail::read_fab(fa[i], fod[i], name);
+            }
+            nreqs -= nrmess;
+            idone[0] = recreads[0];
+            idone[1] = nrmess;
+            ParallelDescriptor::Send(idone, coordproc, donetag);
+        }
+    }
+#else
+    for (MFIter mfi(fa); mfi.isValid(); ++mfi) {
+        detail::read_fab(fa[mfi], fod[mfi.index()], name);
+    }
+#endif
+}
 
 }
 

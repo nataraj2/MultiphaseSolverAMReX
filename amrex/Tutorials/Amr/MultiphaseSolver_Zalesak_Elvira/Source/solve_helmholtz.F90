@@ -68,7 +68,7 @@ contains
 
        call amrex_multigrid_build(multigrid, abeclap)
        call multigrid % set_verbose(verbose)
-       call multigrid % set_cg_verbose(cg_verbose)
+       !call multigrid % set_cg_verbose(cg_verbose)
        call multigrid % set_max_iter(max_iter)
        call multigrid % set_max_fmg_iter(max_fmg_iter)
 

@@ -1,13 +1,16 @@
 
 #ifndef BL_MEMPROFILER_H
 #define BL_MEMPROFILER_H
+#include <AMReX_Config.H>
+
+#include <AMReX_INT.H>
 
 #include <stack>
 #include <functional>
 #include <string>
 #include <vector>
 #include <map>
-#include <iostream>
+#include <iosfwd>
 #include <memory>
 
 namespace amrex {
@@ -17,13 +20,13 @@ class MemProfiler
 public:
 
     struct MemInfo {
-	long current_bytes;
-	long hwm_bytes;
+        Long current_bytes;
+        Long hwm_bytes;
     };
 
     struct NBuildsInfo {
-	int  current_builds;
-	int  hwm_builds;
+        int  current_builds;
+        int  hwm_builds;
     };
 
     static void add (const std::string& name, std::function<MemInfo()>&& f);
@@ -44,18 +47,18 @@ private:
     void report_ (const std::string& prefix, const std::string& memory_log_name) const;
 
     struct Bytes {
-	long mn;
-	long mx;
+        Long mn;
+        Long mx;
     };
-    friend std::ostream& operator<< (std::ostream& os, 
-				     const MemProfiler::Bytes& bytes);
+    friend std::ostream& operator<< (std::ostream& os,
+                                     const MemProfiler::Bytes& bytes);
 
     struct Builds {
-	int mn;
-	int mx;
+        int mn;
+        int mx;
     };
-    friend std::ostream& operator<< (std::ostream& os, 
-				     const MemProfiler::Builds& builds);
+    friend std::ostream& operator<< (std::ostream& os,
+                                     const MemProfiler::Builds& builds);
 
     static MemProfiler& getInstance ();
 

@@ -1,13 +1,25 @@
 
 #ifndef BL_IFARRAYBOX_H
 #define BL_IFARRAYBOX_H
+#include <AMReX_Config.H>
 
 #include <AMReX_Box.H>
 #include <AMReX_BaseFab.H>
-#include <AMReX_REAL.H>
 #include <AMReX_SPACE.H>
 
+#include <iosfwd>
+
 namespace amrex {
+
+class IArrayBox;
+class IntDescriptor;
+
+class IFABio
+{
+public:
+    void write_header (std::ostream& os, const IArrayBox& fab, int nvar) const;
+    void read (std::istream& is, IArrayBox& fab, IntDescriptor const& data_descriptor) const;
+};
 
 /**
 * \brief  A Fortran Array of ints
@@ -35,6 +47,8 @@ class IArrayBox
     public BaseFab<int>
 {
 public:
+    friend class IFABio;
+
     //! Construct an invalid FAB with no memory.
     IArrayBox () noexcept;
 
@@ -49,50 +63,62 @@ public:
     */
     explicit IArrayBox (const Box& b,
                         int        ncomp=1,
-			bool       alloc=true,
-			bool       shared=false,
+                        bool       alloc=true,
+                        bool       shared=false,
                         Arena*     ar = nullptr);
 
     IArrayBox (const IArrayBox& rhs, MakeType make_type, int scomp, int ncomp);
 
-    AMREX_GPU_HOST_DEVICE
     explicit IArrayBox (Array4<int> const& a) noexcept : BaseFab<int>(a) {}
 
-    AMREX_GPU_HOST_DEVICE
     explicit IArrayBox (Array4<int> const& a, IndexType t) noexcept : BaseFab<int>(a,t) {}
 
-    AMREX_GPU_HOST_DEVICE
     explicit IArrayBox (Array4<int const> const& a) noexcept : BaseFab<int>(a) {}
 
-    AMREX_GPU_HOST_DEVICE
     explicit IArrayBox (Array4<int const> const& a, IndexType t) noexcept : BaseFab<int>(a,t) {}
 
     //!  The destructor.
-    AMREX_GPU_HOST_DEVICE
-    ~IArrayBox () noexcept {}
+    virtual ~IArrayBox () noexcept override {}
 
     IArrayBox (IArrayBox&& rhs) noexcept = default;
+    IArrayBox& operator= (IArrayBox&&) = default;
 
     IArrayBox (const IArrayBox&) = delete;
     IArrayBox& operator= (const IArrayBox&) = delete;
-    IArrayBox& operator= (IArrayBox&&) = delete;
 
     //! Set the fab to the value r.
+    template <RunOn run_on>
     IArrayBox& operator= (int r) noexcept;
 
     //! For debugging purposes we hide BaseFab version and do some extra work.
-    void resize (const Box& b,
-                 int        N = 1);
+    void resize (const Box& b, int N = 1, Arena* ar = nullptr);
+
+    void readFrom (std::istream& is);
 
     //! Initialize from ParmParse with "fab" prefix.
     static void Initialize ();
     static void Finalize ();
 
+    static std::unique_ptr<IntDescriptor> getDataDescriptor ();
+
+    static IFABio const& getFABio ();
+
+    static std::string getClassName ();
+
 private:
 
     static bool do_initval;
+    static std::unique_ptr<IFABio> ifabio;
 
 };
+
+template <RunOn run_on>
+IArrayBox&
+IArrayBox::operator= (int v) noexcept
+{
+    BaseFab<int>::operator=<run_on>(v);
+    return *this;
+}
 
 }
 

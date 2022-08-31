@@ -1,5 +1,5 @@
 #include "MyTest.H"
-#include "MyTest_F.H"
+#include "MyTest_K.H"
 
 #include <AMReX_MLEBABecLap.H>
 #include <AMReX_ParmParse.H>
@@ -28,13 +28,15 @@ MyTest::MyTest ()
 void
 MyTest::solve ()
 {
-    for (int ilev = 0; ilev <= max_level; ++ilev) {
-        const MultiFab& vfrc = factory[ilev]->getVolFrac();
-        MultiFab v(vfrc.boxArray(), vfrc.DistributionMap(), 1, 0,
-                   MFInfo(), *factory[ilev]);
-        MultiFab::Copy(v, vfrc, 0, 0, 1, 0);
-        amrex::EB_set_covered(v, 1.0);
-        amrex::Print() << "Level " << ilev << ": vfrc min = " << v.min(0) << std::endl;
+    if (verbose > 0) {
+        for (int ilev = 0; ilev <= max_level; ++ilev) {
+            const MultiFab& vfrc = factory[ilev]->getVolFrac();
+            MultiFab v(vfrc.boxArray(), vfrc.DistributionMap(), 1, 0,
+                       MFInfo(), *factory[ilev]);
+            MultiFab::Copy(v, vfrc, 0, 0, 1, 0);
+            amrex::EB_set_covered(v, 1.0);
+            amrex::Print() << "Level " << ilev << ": vfrc min = " << v.min(0) << std::endl;
+        }
     }
 
     std::array<LinOpBCType,AMREX_SPACEDIM> mlmg_lobc;
@@ -51,25 +53,36 @@ MyTest::solve ()
 
     LPInfo info;
     info.setMaxCoarseningLevel(max_coarsening_level);
+    info.setAgglomerationGridSize(agg_grid_size);
+    info.setConsolidationGridSize(con_grid_size);
+
+    for (int ilev = 0; ilev <= max_level; ++ilev) {
+        phi[ilev].setVal(0.0,0,1,IntVect(0));
+    }
+
+    static int ipass = 0;
+    ++ipass;
 
     if (composite_solve)
     {
+        BL_PROFILE_REGION("COMPOSITE_SOLVE-pass"+std::to_string(ipass));
+
         MLEBABecLap mleb (geom, grids, dmap, info, amrex::GetVecOfConstPtrs(factory));
         mleb.setMaxOrder(linop_maxorder);
-        
+
         mleb.setDomainBC(mlmg_lobc, mlmg_hibc);
 
         for (int ilev = 0; ilev <= max_level; ++ilev) {
             mleb.setLevelBC(ilev, &phi[ilev]);
         }
-        
+
         mleb.setScalars(scalars[0], scalars[1]);
-        
+
         for (int ilev = 0; ilev <= max_level; ++ilev) {
             mleb.setACoeffs(ilev, acoef[ilev]);
             mleb.setBCoeffs(ilev, amrex::GetArrOfConstPtrs(bcoef[ilev]));
         }
-        
+
         if (true) { // In this test we assume EB is Dirichlet.
             for (int ilev = 0; ilev <= max_level; ++ilev) {
                 mleb.setEBDirichlet(ilev, phieb[ilev], bcoef_eb[ilev]);
@@ -88,7 +101,7 @@ MyTest::solve ()
         } else if (use_petsc) {
             mlmg.setBottomSolver(MLMG::BottomSolver::petsc);
         }
-        
+
         const Real tol_rel = reltol;
         const Real tol_abs = 0.0;
         mlmg.solve(amrex::GetVecOfPtrs(phi), amrex::GetVecOfConstPtrs(rhs), tol_rel, tol_abs);
@@ -97,6 +110,8 @@ MyTest::solve ()
     {
         for (int ilev = 0; ilev <= max_level; ++ilev)
         {
+            BL_PROFILE_REGION("LEVEL-SOLVE-lev"+std::to_string(ilev)+"-pass"+std::to_string(ipass));
+
             MLEBABecLap mleb({geom[ilev]}, {grids[ilev]}, {dmap[ilev]}, info, {factory[ilev].get()});
             mleb.setMaxOrder(linop_maxorder);
 
@@ -128,56 +143,78 @@ MyTest::solve ()
             } else if (use_petsc) {
                 mlmg.setBottomSolver(MLMG::BottomSolver::petsc);
             }
-            
+
             const Real tol_rel = reltol;
             const Real tol_abs = 0.0;
             mlmg.solve({&phi[ilev]}, {&rhs[ilev]}, tol_rel, tol_abs);
         }
     }
 
-    for (int ilev = 0; ilev <= max_level; ++ilev)
-    {
-        MultiFab mf(phi[ilev].boxArray(),phi[ilev].DistributionMap(), 1, 0);
-        MultiFab::Copy(mf,phi[ilev],0,0,1,0);
-        MultiFab::Subtract(mf, phiexact[ilev], 0, 0, 1, 0);
+    if (verbose > 0) {
+        for (int ilev = 0; ilev <= max_level; ++ilev)
+        {
+            MultiFab mf(phi[ilev].boxArray(),phi[ilev].DistributionMap(), 1, 0);
+            MultiFab::Copy(mf,phi[ilev],0,0,1,0);
+            MultiFab::Subtract(mf, phiexact[ilev], 0, 0, 1, 0);
 
-        const MultiFab& vfrc = factory[ilev]->getVolFrac();
+            const MultiFab& vfrc = factory[ilev]->getVolFrac();
 
-        MultiFab::Multiply(mf, vfrc, 0, 0, 1, 0);
+            MultiFab::Multiply(mf, vfrc, 0, 0, 1, 0);
 
-        Real norminf = mf.norm0();
-        Real norm1 = mf.norm1()*AMREX_D_TERM((1.0/n_cell), *(1.0/n_cell), *(1.0/n_cell));
-        amrex::Print() << "Level " << ilev << ": weighted max and 1 norms " << norminf << ", " << norm1 << std::endl;        
-    }    
+            Real norminf = mf.norm0();
+            Real norm1 = mf.norm1()*AMREX_D_TERM((1.0/n_cell), *(1.0/n_cell), *(1.0/n_cell));
+            amrex::Print() << "Level " << ilev << ": weighted max and 1 norms " << norminf << ", " << norm1 << std::endl;
+        }
+    }
 }
 
 void
 MyTest::writePlotfile ()
 {
+    ParmParse pp;
+    bool gpu_regtest = false;
+#ifdef AMREX_USE_GPU
+    pp.query("gpu_regtest", gpu_regtest);
+#endif
     Vector<MultiFab> plotmf(max_level+1);
-    for (int ilev = 0; ilev <= max_level; ++ilev) {
-        const MultiFab& vfrc = factory[ilev]->getVolFrac();
-        plotmf[ilev].define(grids[ilev],dmap[ilev],5,0);
+    if (gpu_regtest) {
+        for (int ilev = 0; ilev <= max_level; ++ilev) {
+            const MultiFab& vfrc = factory[ilev]->getVolFrac();
+            plotmf[ilev].define(grids[ilev],dmap[ilev],3,0);
+            MultiFab::Copy(plotmf[ilev], phi[ilev], 0, 0, 1, 0);
+            MultiFab::Copy(plotmf[ilev], phiexact[ilev], 0, 1, 1, 0);
+            MultiFab::Copy(plotmf[ilev], vfrc, 0, 2, 1, 0);
+        }
+        WriteMultiLevelPlotfile(plot_file_name, max_level+1,
+                                amrex::GetVecOfConstPtrs(plotmf),
+                                {"phi","exact","vfrac"},
+                                geom, 0.0, Vector<int>(max_level+1,0),
+                                Vector<IntVect>(max_level,IntVect{2}));
+    } else {
+        for (int ilev = 0; ilev <= max_level; ++ilev) {
+            const MultiFab& vfrc = factory[ilev]->getVolFrac();
+            plotmf[ilev].define(grids[ilev],dmap[ilev],5,0);
 
-        MultiFab::Copy(plotmf[ilev], phi[ilev], 0, 0, 1, 0);
+            MultiFab::Copy(plotmf[ilev], phi[ilev], 0, 0, 1, 0);
 
-        MultiFab::Copy(plotmf[ilev], phiexact[ilev], 0, 1, 1, 0);
+            MultiFab::Copy(plotmf[ilev], phiexact[ilev], 0, 1, 1, 0);
 
-        MultiFab::Copy(plotmf[ilev], phi[ilev], 0, 2, 1, 0);
-        MultiFab::Subtract(plotmf[ilev], phiexact[ilev], 0, 2, 1, 0);
+            MultiFab::Copy(plotmf[ilev], phi[ilev], 0, 2, 1, 0);
+            MultiFab::Subtract(plotmf[ilev], phiexact[ilev], 0, 2, 1, 0);
 
-        MultiFab::Copy(plotmf[ilev], phi[ilev], 0, 3, 1, 0);
-        MultiFab::Subtract(plotmf[ilev], phiexact[ilev], 0, 3, 1, 0);
-        MultiFab::Multiply(plotmf[ilev], vfrc, 0, 3, 1, 0);
+            MultiFab::Copy(plotmf[ilev], phi[ilev], 0, 3, 1, 0);
+            MultiFab::Subtract(plotmf[ilev], phiexact[ilev], 0, 3, 1, 0);
+            MultiFab::Multiply(plotmf[ilev], vfrc, 0, 3, 1, 0);
 
-        MultiFab::Copy(plotmf[ilev], vfrc, 0, 4, 1, 0);    
+            MultiFab::Copy(plotmf[ilev], vfrc, 0, 4, 1, 0);
+        }
+        WriteMultiLevelPlotfile(plot_file_name, max_level+1,
+                                amrex::GetVecOfConstPtrs(plotmf),
+                                {"phi","exact","error","error*vfrac","vfrac"},
+                                geom, 0.0, Vector<int>(max_level+1,0),
+                                Vector<IntVect>(max_level,IntVect{2}));
     }
-    WriteMultiLevelPlotfile(plot_file_name, max_level+1,
-                            amrex::GetVecOfConstPtrs(plotmf),
-                            {"phi","exact","error","error*vfrac","vfrac"},
-                            geom, 0.0, Vector<int>(max_level+1,0),
-                            Vector<IntVect>(max_level,IntVect{2}));
-                            
+
 }
 
 void
@@ -215,6 +252,8 @@ MyTest::readParameters ()
 #ifdef AMREX_USE_PETSC
     pp.query("use_petsc", use_petsc);
 #endif
+    pp.query("agg_grid_size", agg_grid_size);
+    pp.query("con_grid_size", con_grid_size);
 
     pp.query("composite_solve", composite_solve);
 }
@@ -277,8 +316,8 @@ MyTest::initData ()
         dmap[ilev].define(grids[ilev]);
         const EB2::IndexSpace& eb_is = EB2::IndexSpace::top();
         const EB2::Level& eb_level = eb_is.getLevel(geom[ilev]);
-        factory[ilev].reset(new EBFArrayBoxFactory(eb_level, geom[ilev], grids[ilev], dmap[ilev],
-                                                   {2,2,2}, EBSupport::full));
+        factory[ilev] = std::make_unique<EBFArrayBoxFactory>
+            (eb_level, geom[ilev], grids[ilev], dmap[ilev], Vector<int>{2,2,2}, EBSupport::full);
 
         phi[ilev].define(grids[ilev], dmap[ilev], 1, 1, MFInfo(), *factory[ilev]);
         phiexact[ilev].define(grids[ilev], dmap[ilev], 1, 0, MFInfo(), *factory[ilev]);
@@ -299,63 +338,64 @@ MyTest::initData ()
             bcoef[ilev][idim].setVal(1.0);
         }
 
-        const Real* dx = geom[ilev].CellSize();
+        const auto dx = geom[ilev].CellSizeArray();
         const Box& domainbox = geom[ilev].Domain();
+        const auto lprob_type = this->prob_type;
 
         const FabArray<EBCellFlagFab>& flags = factory[ilev]->getMultiEBCellFlagFab();
         const MultiCutFab& bcent = factory[ilev]->getBndryCent();
         const MultiCutFab& cent = factory[ilev]->getCentroid();
 
-        for (MFIter mfi(phiexact[ilev],true); mfi.isValid(); ++mfi)
-        {
-            const Box& bx = mfi.tilebox();
-            const Box& xbx = mfi.nodaltilebox(0);
-            const Box& ybx = mfi.nodaltilebox(1);
-#if (AMREX_SPACEDIM == 3)
-            const Box& zbx = mfi.nodaltilebox(2);
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (Gpu::notInLaunchRegion())
 #endif
+        for (MFIter mfi(phiexact[ilev]); mfi.isValid(); ++mfi)
+        {
+            const Box& bx = mfi.validbox();
+            const Box& nbx = amrex::surroundingNodes(bx);
+            Array4<Real> const& phi_arr = phi[ilev].array(mfi);
+            Array4<Real> const& phi_ex_arr = phiexact[ilev].array(mfi);
+            Array4<Real> const& phi_eb_arr = phieb[ilev].array(mfi);
+            Array4<Real> const& rhs_arr = rhs[ilev].array(mfi);
+            AMREX_D_TERM(Array4<Real> const& bx_arr = bcoef[ilev][0].array(mfi);,
+                         Array4<Real> const& by_arr = bcoef[ilev][1].array(mfi);,
+                         Array4<Real> const& bz_arr = bcoef[ilev][2].array(mfi););
+
             auto fabtyp = flags[mfi].getType(bx);
             if (FabType::covered == fabtyp) {
-                phiexact[ilev][mfi].setVal(0.0, bx, 0, 1);
-                phieb[ilev][mfi].setVal(0.0, bx, 0, 1);
+                amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
+                {
+                    phi_ex_arr(i,j,k) = 0.0;
+                    phi_eb_arr(i,j,k) = 0.0;
+                });
             } else if (FabType::regular == fabtyp) {
-                phieb[ilev][mfi].setVal(0.0, bx, 0, 1);
-                mytest_set_phi_reg(BL_TO_FORTRAN_BOX(bx),
-                                   AMREX_D_DECL(BL_TO_FORTRAN_BOX(xbx),
-                                                BL_TO_FORTRAN_BOX(ybx),
-                                                BL_TO_FORTRAN_BOX(zbx)),
-                                   BL_TO_FORTRAN_ANYD(phiexact[ilev][mfi]),
-                                   BL_TO_FORTRAN_ANYD(rhs[ilev][mfi]),
-                                   AMREX_D_DECL(BL_TO_FORTRAN_ANYD(bcoef[ilev][0][mfi]),
-                                                BL_TO_FORTRAN_ANYD(bcoef[ilev][1][mfi]),
-                                                BL_TO_FORTRAN_ANYD(bcoef[ilev][2][mfi])),
-                                   dx, &prob_type);
+                amrex::ParallelFor(nbx, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
+                {
+                    mytest_set_phi_reg(i,j,k,phi_ex_arr,rhs_arr,
+                                       AMREX_D_DECL(bx_arr,by_arr,bz_arr),
+                                       dx, lprob_type, bx);
+                });
             } else {
-                mytest_set_phi_eb(BL_TO_FORTRAN_BOX(bx),
-                                  AMREX_D_DECL(BL_TO_FORTRAN_BOX(xbx),
-                                               BL_TO_FORTRAN_BOX(ybx),
-                                               BL_TO_FORTRAN_BOX(zbx)),
-                                  BL_TO_FORTRAN_ANYD(phiexact[ilev][mfi]),
-                                  BL_TO_FORTRAN_ANYD(phieb[ilev][mfi]),
-                                  BL_TO_FORTRAN_ANYD(rhs[ilev][mfi]),
-                                  AMREX_D_DECL(BL_TO_FORTRAN_ANYD(bcoef[ilev][0][mfi]),
-                                               BL_TO_FORTRAN_ANYD(bcoef[ilev][1][mfi]),
-                                               BL_TO_FORTRAN_ANYD(bcoef[ilev][2][mfi])),
-                                  BL_TO_FORTRAN_ANYD(bcoef_eb[ilev][mfi]),
-                                  BL_TO_FORTRAN_ANYD(flags[mfi]),
-                                  BL_TO_FORTRAN_ANYD(cent[mfi]),
-                                  BL_TO_FORTRAN_ANYD(bcent[mfi]),
-                                  dx, &prob_type);
+                Array4<Real> const& beb_arr = bcoef_eb[ilev].array(mfi);
+                Array4<EBCellFlag const> const& flag_arr = flags.const_array(mfi);
+                Array4<Real const> const& cent_arr = cent.const_array(mfi);
+                Array4<Real const> const& bcent_arr = bcent.const_array(mfi);
+                amrex::ParallelFor(nbx, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
+                {
+                    mytest_set_phi_eb(i,j,k,phi_ex_arr,phi_eb_arr,rhs_arr,
+                                      AMREX_D_DECL(bx_arr,by_arr,bz_arr),
+                                      beb_arr,flag_arr,cent_arr,bcent_arr,
+                                      dx, lprob_type, bx);
+                });
             }
 
             const Box& gbx = mfi.growntilebox(1);
             if (!domainbox.contains(gbx)) {
-                mytest_set_phi_boundary(BL_TO_FORTRAN_BOX(gbx),
-                                        BL_TO_FORTRAN_BOX(domainbox),
-                                        BL_TO_FORTRAN_ANYD(phi[ilev][mfi]),
-                                        dx);
+                amrex::ParallelFor(gbx, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
+                {
+                    mytest_set_phi_boundary(i,j,k,phi_arr,dx,domainbox);
+                });
             }
         }
     }
 }
-

@@ -1,14 +1,14 @@
 
 #ifndef AMREX_EB2_IF_SPLINE_H_
 #define AMREX_EB2_IF_SPLINE_H_
+#include <AMReX_Config.H>
 
-#include <vector>
 #include <AMReX_EB2_IF_Base.H>
-#include "AMReX_RealVect.H"
-#include "AMReX.H"
-#include "AMReX_Vector.H"
-#include "AMReX_Array.H"
-#include "AMReX_distFcnElement.H"
+#include <AMReX_RealVect.H>
+#include <AMReX.H>
+#include <AMReX_Vector.H>
+#include <AMReX_Array.H>
+#include <AMReX_distFcnElement.H>
 
 namespace amrex { namespace EB2 {
 
@@ -19,9 +19,6 @@ class SplineIF {
  public:
   //! Constructor
   SplineIF() {}
-
-  //! Destructor
-  ~SplineIF() {}
 
   void addSplineElement(std::vector<amrex::RealVect> pts) {
     SplineDistFcnElement2d * theSpline = new SplineDistFcnElement2d();
@@ -40,9 +37,8 @@ class SplineIF {
     amrex::RealVect cp;
     distFcnElement2d * closesetGeomElement;
     amrex::Real dist;
-    dist = 1.0e29;
-    amrex::RealVect x;
-    x[0] = p[0];x[1] = p[1]; x[2] = p[2];
+    dist = 1.0e29_rt;
+    amrex::RealVect x(AMREX_D_DECL(p[0], p[1], p[2]));
     for (auto * geom : geomElements ) {
       amrex::Real d = geom->cpdist(x, cp);
       if (d < dist) {

@@ -1,3 +1,4 @@
+#include <AMReX_Config.H>
 
 module amrex_fab_module
 
@@ -126,8 +127,8 @@ contains
     type(amrex_box), intent(in) :: bx
     integer, intent(in) :: nc
     if (.not.associated(this%fp) .or. &
-         &         bx%numpts()*int(     nc,c_long) &
-         .gt. this%bx%numpts()*int(this%nc,c_long)) then
+         &         bx%numpts()*int(     nc,amrex_long) &
+         .gt. this%bx%numpts()*int(this%nc,amrex_long)) then
        call amrex_fab_build(this, bx, nc)
     else
        this%bx = bx
@@ -158,7 +159,8 @@ contains
   ! Used incorrectly, this will cause memory leak!
   subroutine amrex_fab_reset_omp_private (this)
     class(amrex_fab), intent(inout) :: this
-    this%bx = amrex_box()
+    type(amrex_box) :: b
+    this%bx = b
     this%nc = 0
     this%owner = .false.
     this%cp = c_null_ptr

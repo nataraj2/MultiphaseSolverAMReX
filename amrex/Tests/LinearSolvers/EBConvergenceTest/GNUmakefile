@@ -13,7 +13,7 @@ COMP = gnu
 
 DIM = 2
 
-AMREX_HOME ?= ../../..
+AMREX_HOME = ../../..
 
 include $(AMREX_HOME)/Tools/GNUMake/Make.defs
 
@@ -21,7 +21,7 @@ include ./Make.package
 
 Pdirs := Base Boundary AmrCore
 Pdirs += EB
-Pdirs += LinearSolvers/C_CellMG LinearSolvers/MLMG
+Pdirs += LinearSolvers/MLMG
 
 Ppack	+= $(foreach dir, $(Pdirs), $(AMREX_HOME)/Src/$(dir)/Make.package)
 

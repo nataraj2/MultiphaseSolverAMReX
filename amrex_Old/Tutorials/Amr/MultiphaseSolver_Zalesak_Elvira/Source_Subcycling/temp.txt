@@ -1,0 +1,171 @@
+Make.package:F90EXE_sources += averagedown_mod.F90 evolve_mod.F90 compute_dt_mod.F90 fillpatch_mod.F90 face_velocity_multifab.F90 mod_compute_cell_value.F90 mod_compute_correction_step.F90
+Src_3d/plic_mod.f90:    use fillpatch_module, only : fillpatch!, fillpatchthree
+Src_3d/plic_mod.f90:      call fillpatch(ilev,t_new(0),phiborder,phi_new,phi_old)
+Testing/test_acousticpulse3D/compute_dt_mod.F90:    use fillpatch_module, only : fillpatch
+Testing/test_acousticpulse3D/compute_dt_mod.F90:    call fillpatch(lev, time, phiborder, phi_new, phi_old)
+Testing/test_acousticpulse3D/fillpatch_mod.F90:module fillpatch_module
+Testing/test_acousticpulse3D/fillpatch_mod.F90:  public :: fillpatch, fillcoarsepatch, fillpatchsingle
+Testing/test_acousticpulse3D/fillpatch_mod.F90:  subroutine fillpatch (lev, time, varmfab_border, varmfab, varmfab_old)
+Testing/test_acousticpulse3D/fillpatch_mod.F90:       call amrex_fillpatch(varmfab_border, t_old(lev), varmfab_old(lev), &
+Testing/test_acousticpulse3D/fillpatch_mod.F90:       call amrex_fillpatch(varmfab_border, t_old(lev-1), varmfab_old(lev-1), &
+Testing/test_acousticpulse3D/fillpatch_mod.F90:  end subroutine fillpatch
+Testing/test_acousticpulse3D/fillpatch_mod.F90:subroutine fillpatchsingle (lev, time, varmfab_border, varmfab, varmfab_old)
+Testing/test_acousticpulse3D/fillpatch_mod.F90:       call amrex_fillpatch(varmfab_border, t_old(lev), varmfab_old(lev), &
+Testing/test_acousticpulse3D/fillpatch_mod.F90:       call amrex_fillpatch(varmfab_border, t_old(lev-1), varmfab_old(lev-1), &
+Testing/test_acousticpulse3D/fillpatch_mod.F90:  end subroutine fillpatchsingle
+Testing/test_acousticpulse3D/fillpatch_mod.F90:end module fillpatch_module
+Testing/test_acousticpulse3D/my_amr_mod.F90:    use fillpatch_module, only : fillcoarsepatch
+Testing/test_acousticpulse3D/my_amr_mod.F90:    use fillpatch_module, only : fillpatch
+Testing/test_acousticpulse3D/my_amr_mod.F90:    use fillpatch_module, only : fillpatch
+Testing/test_acousticpulse3D/my_amr_mod.F90:    call fillpatch(lev, time, new_phi_new, varmfab, varmfab_old)
+Testing/test_acousticpulse3D/my_amr_mod.F90:    use fillpatch_module, only : fillcoarsepatch
+Testing/test_acousticpulse3D/rhs_helmholtz.F90:  use fillpatch_module
+Testing/test_acousticpulse3D/rhs_helmholtz.F90:       call fillpatch (ilev, time, phi_mp_nbormfab, phi_mp_n, phi_mp_n)
+Testing/test_jet/compute_dt_mod.F90:    use fillpatch_module, only : fillpatch
+Testing/test_jet/compute_dt_mod.F90:    call fillpatch(lev, time, phiborder, phi_new, phi_old)
+Testing/test_jet/fillpatch_mod.F90:module fillpatch_module
+Testing/test_jet/fillpatch_mod.F90:  public :: fillpatch, fillcoarsepatch, fillpatchsingle
+Testing/test_jet/fillpatch_mod.F90:  subroutine fillpatch (lev, time, varmfab_border, varmfab, varmfab_old)
+Testing/test_jet/fillpatch_mod.F90:       call amrex_fillpatch(varmfab_border, t_old(lev), varmfab_old(lev), &
+Testing/test_jet/fillpatch_mod.F90:       call amrex_fillpatch(varmfab_border, t_old(lev-1), varmfab_old(lev-1), &
+Testing/test_jet/fillpatch_mod.F90:  end subroutine fillpatch
+Testing/test_jet/fillpatch_mod.F90:subroutine fillpatchsingle (lev, time, varmfab_border, varmfab, varmfab_old)
+Testing/test_jet/fillpatch_mod.F90:       call amrex_fillpatch(varmfab_border, t_old(lev), varmfab_old(lev), &
+Testing/test_jet/fillpatch_mod.F90:       call amrex_fillpatch(varmfab_border, t_old(lev-1), varmfab_old(lev-1), &
+Testing/test_jet/fillpatch_mod.F90:  end subroutine fillpatchsingle
+Testing/test_jet/fillpatch_mod.F90:end module fillpatch_module
+Testing/test_jet/my_amr_mod.F90:    use fillpatch_module, only : fillcoarsepatch
+Testing/test_jet/my_amr_mod.F90:    use fillpatch_module, only : fillpatch
+Testing/test_jet/my_amr_mod.F90:    use fillpatch_module, only : fillpatch
+Testing/test_jet/my_amr_mod.F90:    call fillpatch(lev, time, new_phi_new, varmfab, varmfab_old)
+Testing/test_jet/my_amr_mod.F90:    use fillpatch_module, only : fillcoarsepatch
+Testing/test_jet/rhs_helmholtz.F90:  use fillpatch_module
+Testing/test_jet/rhs_helmholtz.F90:       call fillpatch (ilev, time, phi_mp_nbormfab, phi_mp_n, phi_mp_n)
+Testing/test_jicf/compute_dt_mod.F90:    use fillpatch_module, only : fillpatch
+Testing/test_jicf/compute_dt_mod.F90:    call fillpatch(lev, time, phiborder, phi_new, phi_old)
+Testing/test_jicf/fillpatch_mod.F90:module fillpatch_module
+Testing/test_jicf/fillpatch_mod.F90:  public :: fillpatch, fillcoarsepatch, fillpatchsingle
+Testing/test_jicf/fillpatch_mod.F90:  subroutine fillpatch (lev, time, varmfab_border, varmfab, varmfab_old)
+Testing/test_jicf/fillpatch_mod.F90:       call amrex_fillpatch(varmfab_border, t_old(lev), varmfab_old(lev), &
+Testing/test_jicf/fillpatch_mod.F90:       call amrex_fillpatch(varmfab_border, t_old(lev-1), varmfab_old(lev-1), &
+Testing/test_jicf/fillpatch_mod.F90:  end subroutine fillpatch
+Testing/test_jicf/fillpatch_mod.F90:subroutine fillpatchsingle (lev, time, varmfab_border, varmfab, varmfab_old)
+Testing/test_jicf/fillpatch_mod.F90:       call amrex_fillpatch(varmfab_border, t_old(lev), varmfab_old(lev), &
+Testing/test_jicf/fillpatch_mod.F90:       call amrex_fillpatch(varmfab_border, t_old(lev-1), varmfab_old(lev-1), &
+Testing/test_jicf/fillpatch_mod.F90:  end subroutine fillpatchsingle
+Testing/test_jicf/fillpatch_mod.F90:end module fillpatch_module
+Testing/test_jicf/my_amr_mod.F90:    use fillpatch_module, only : fillcoarsepatch
+Testing/test_jicf/my_amr_mod.F90:    use fillpatch_module, only : fillpatch
+Testing/test_jicf/my_amr_mod.F90:    use fillpatch_module, only : fillpatch
+Testing/test_jicf/my_amr_mod.F90:    call fillpatch(lev, time, new_phi_new, varmfab, varmfab_old)
+Testing/test_jicf/my_amr_mod.F90:    use fillpatch_module, only : fillcoarsepatch
+Testing/test_jicf/rhs_helmholtz.F90:  use fillpatch_module
+Testing/test_jicf/rhs_helmholtz.F90:       call fillpatch (ilev, time, phi_mp_nbormfab, phi_mp_n, phi_mp_n)
+Testing/test_jicf_RefCritVortMag/compute_dt_mod.F90:    use fillpatch_module, only : fillpatch
+Testing/test_jicf_RefCritVortMag/compute_dt_mod.F90:    call fillpatch(lev, time, phiborder, phi_new, phi_old)
+Testing/test_jicf_RefCritVortMag/fillpatch_mod.F90:module fillpatch_module
+Testing/test_jicf_RefCritVortMag/fillpatch_mod.F90:  public :: fillpatch, fillcoarsepatch, fillpatchsingle
+Testing/test_jicf_RefCritVortMag/fillpatch_mod.F90:  subroutine fillpatch (lev, time, varmfab_border, varmfab, varmfab_old)
+Testing/test_jicf_RefCritVortMag/fillpatch_mod.F90:       call amrex_fillpatch(varmfab_border, t_old(lev), varmfab_old(lev), &
+Testing/test_jicf_RefCritVortMag/fillpatch_mod.F90:       call amrex_fillpatch(varmfab_border, t_old(lev-1), varmfab_old(lev-1), &
+Testing/test_jicf_RefCritVortMag/fillpatch_mod.F90:  end subroutine fillpatch
+Testing/test_jicf_RefCritVortMag/fillpatch_mod.F90:subroutine fillpatchsingle (lev, time, varmfab_border, varmfab, varmfab_old)
+Testing/test_jicf_RefCritVortMag/fillpatch_mod.F90:       call amrex_fillpatch(varmfab_border, t_old(lev), varmfab_old(lev), &
+Testing/test_jicf_RefCritVortMag/fillpatch_mod.F90:       call amrex_fillpatch(varmfab_border, t_old(lev-1), varmfab_old(lev-1), &
+Testing/test_jicf_RefCritVortMag/fillpatch_mod.F90:  end subroutine fillpatchsingle
+Testing/test_jicf_RefCritVortMag/fillpatch_mod.F90:end module fillpatch_module
+Testing/test_jicf_RefCritVortMag/my_amr_mod.F90:    use fillpatch_module, only : fillcoarsepatch
+Testing/test_jicf_RefCritVortMag/my_amr_mod.F90:    use fillpatch_module, only : fillpatch
+Testing/test_jicf_RefCritVortMag/my_amr_mod.F90:subroutine create_remakelevel_and_copy(lev,time,varmfab,varmfab_old,ba,dm,numcomp,ngrow,isidentical,isfillpatch)
+Testing/test_jicf_RefCritVortMag/my_amr_mod.F90:    use fillpatch_module, only : fillpatch
+Testing/test_jicf_RefCritVortMag/my_amr_mod.F90:    logical, intent(in) :: isidentical,isfillpatch
+Testing/test_jicf_RefCritVortMag/my_amr_mod.F90:    if(isfillpatch.eqv..true.)then
+Testing/test_jicf_RefCritVortMag/my_amr_mod.F90:    call fillpatch(lev, time, new_phi_new, varmfab, varmfab_old)
+Testing/test_jicf_RefCritVortMag/my_amr_mod.F90:subroutine create_newlevel_and_copy(lev,time,varmfab,varmfab_old,ba,dm,numcomp,ngrow,isidentical,isfillpatch)
+Testing/test_jicf_RefCritVortMag/my_amr_mod.F90:    use fillpatch_module, only : fillcoarsepatch
+Testing/test_jicf_RefCritVortMag/my_amr_mod.F90:    logical, intent(in) :: isidentical,isfillpatch
+Testing/test_jicf_RefCritVortMag/my_amr_mod.F90:    if(isfillpatch.eqv..true.)then
+Testing/test_jicf_RefCritVortMag/rhs_helmholtz.F90:  use fillpatch_module
+Testing/test_jicf_RefCritVortMag/rhs_helmholtz.F90:       call fillpatch (ilev, time, phi_mp_nbormfab, phi_mp_n, phi_mp_n)
+Testing/test_shocktube/compute_dt_mod.F90:    use fillpatch_module, only : fillpatch
+Testing/test_shocktube/compute_dt_mod.F90:    call fillpatch(lev, time, phiborder, phi_new, phi_old)
+Testing/test_shocktube/fillpatch_mod.F90:module fillpatch_module
+Testing/test_shocktube/fillpatch_mod.F90:  public :: fillpatch, fillcoarsepatch, fillpatchsingle
+Testing/test_shocktube/fillpatch_mod.F90:  subroutine fillpatch (lev, time, varmfab_border, varmfab, varmfab_old)
+Testing/test_shocktube/fillpatch_mod.F90:       call amrex_fillpatch(varmfab_border, t_old(lev), varmfab_old(lev), &
+Testing/test_shocktube/fillpatch_mod.F90:       call amrex_fillpatch(varmfab_border, t_old(lev-1), varmfab_old(lev-1), &
+Testing/test_shocktube/fillpatch_mod.F90:  end subroutine fillpatch
+Testing/test_shocktube/fillpatch_mod.F90:subroutine fillpatchsingle (lev, time, varmfab_border, varmfab, varmfab_old)
+Testing/test_shocktube/fillpatch_mod.F90:       call amrex_fillpatch(varmfab_border, t_old(lev), varmfab_old(lev), &
+Testing/test_shocktube/fillpatch_mod.F90:       call amrex_fillpatch(varmfab_border, t_old(lev-1), varmfab_old(lev-1), &
+Testing/test_shocktube/fillpatch_mod.F90:  end subroutine fillpatchsingle
+Testing/test_shocktube/fillpatch_mod.F90:end module fillpatch_module
+Testing/test_shocktube/my_amr_mod.F90:    use fillpatch_module, only : fillcoarsepatch
+Testing/test_shocktube/my_amr_mod.F90:    use fillpatch_module, only : fillpatch
+Testing/test_shocktube/my_amr_mod.F90:subroutine create_remakelevel_and_copy(lev,time,varmfab,varmfab_old,ba,dm,numcomp,ngrow,isidentical,isfillpatch)
+Testing/test_shocktube/my_amr_mod.F90:    use fillpatch_module, only : fillpatch
+Testing/test_shocktube/my_amr_mod.F90:    logical, intent(in) :: isidentical,isfillpatch
+Testing/test_shocktube/my_amr_mod.F90:    if(isfillpatch.eqv..true.)then
+Testing/test_shocktube/my_amr_mod.F90:    call fillpatch(lev, time, new_phi_new, varmfab, varmfab_old)
+Testing/test_shocktube/my_amr_mod.F90:subroutine create_newlevel_and_copy(lev,time,varmfab,varmfab_old,ba,dm,numcomp,ngrow,isidentical,isfillpatch)
+Testing/test_shocktube/my_amr_mod.F90:    use fillpatch_module, only : fillcoarsepatch
+Testing/test_shocktube/my_amr_mod.F90:    logical, intent(in) :: isidentical,isfillpatch
+Testing/test_shocktube/my_amr_mod.F90:    if(isfillpatch.eqv..true.)then
+Testing/test_shocktube/rhs_helmholtz.F90:  use fillpatch_module
+Testing/test_shocktube/rhs_helmholtz.F90:       call fillpatch (ilev, time, phi_mp_nbormfab, phi_mp_n, phi_mp_n)
+compute_dt_mod.F90:    use fillpatch_module, only : fillpatch
+compute_dt_mod.F90:    call fillpatch(lev, time, phiborder, phi_new, phi_old)
+evolve_mod.F90:    use fillpatch_module, only : fillpatch
+evolve_mod.F90:    call fillpatch(lev, time, phiborder,phi_new,phi_old)
+evolve_mod.F90:    call fillpatch(lev, time, phi_nborder,phi_n,phi_n) 
+evolve_mod.F90:    call fillpatch(lev, time, gradxphiborder, gradxphi, gradxphi)
+evolve_mod.F90:    call fillpatch(lev, time, gradyphiborder, gradyphi, gradyphi)
+evolve_mod.F90:    call fillpatch(lev, time, gradzphiborder, gradzphi, gradzphi)
+evolve_mod.F90.bkp:    use fillpatch_module, only : fillpatch
+evolve_mod.F90.bkp:    call fillpatch(lev, time, phiborder,phi_new,phi_old)
+evolve_mod.F90.bkp:    call fillpatch(lev, time, phi_nborder,phi_n,phi_n) 
+evolve_mod.F90.bkp:    call fillpatch(lev, time, gradxphiborder, gradxphi, gradxphi)
+evolve_mod.F90.bkp:    call fillpatch(lev, time, gradyphiborder, gradyphi, gradyphi)
+evolve_mod.F90.bkp:    call fillpatch(lev, time, gradzphiborder, gradzphi, gradzphi)
+face_velocity_multifab.F90:    use fillpatch_module, only : fillpatch
+face_velocity_multifab.F90:    call fillpatch(lev, time, phiborder,phi,phi)
+fillpatch_mod.F90:module fillpatch_module
+fillpatch_mod.F90:  public :: fillpatch, fillcoarsepatch, fillpatchsingle
+fillpatch_mod.F90:  subroutine fillpatch (lev, time, varmfab_border, varmfab, varmfab_old)
+fillpatch_mod.F90:       call amrex_fillpatch(varmfab_border, t_old(lev), varmfab_old(lev), &
+fillpatch_mod.F90:       call amrex_fillpatch(varmfab_border, t_old(lev-1), varmfab_old(lev-1), &
+fillpatch_mod.F90:  end subroutine fillpatch
+fillpatch_mod.F90:subroutine fillpatchsingle (lev, time, varmfab_border, varmfab, varmfab_old)
+fillpatch_mod.F90:       call amrex_fillpatch(varmfab_border, t_old(lev), varmfab_old(lev), &
+fillpatch_mod.F90:       call amrex_fillpatch(varmfab_border, t_old(lev-1), varmfab_old(lev-1), &
+fillpatch_mod.F90:  end subroutine fillpatchsingle
+fillpatch_mod.F90:end module fillpatch_module
+mod_compute_interp_pressure.F90:  use fillpatch_module
+mod_compute_interp_pressure.F90:       call fillpatch (ilev, time, phiborder, phi_mp, phi_mp)
+mod_compute_interp_rho.F90:  use fillpatch_module
+mod_compute_interp_rho.F90:       call fillpatch (ilev, time, phiborder, phi_mp, phi_mp)
+mod_compute_vortmag.F90:  use fillpatch_module
+mod_compute_vortmag.F90:       call fillpatch(lev, time, phiborder,phi_new,phi_new)
+mod_compute_vortmag.F90.bkp:  use fillpatch_module
+mod_compute_vortmag.F90.bkp:       call fillpatchsingle (ilev, time, Uborder, Umfab, Umfab)
+mod_compute_vortmag.F90.bkp:       call fillpatchsingle (ilev, time, Vborder, Vmfab, Vmfab)
+mod_compute_vortmag.F90.bkp:       call fillpatchsingle (ilev, time, Wborder, Wmfab, Wmfab)
+my_amr_mod.F90:    use fillpatch_module, only : fillcoarsepatch
+my_amr_mod.F90:    use fillpatch_module, only : fillpatch
+my_amr_mod.F90:subroutine create_remakelevel_and_copy(lev,time,varmfab,varmfab_old,ba,dm,numcomp,ngrow,isidentical,isfillpatch)
+my_amr_mod.F90:    use fillpatch_module, only : fillpatch
+my_amr_mod.F90:    logical, intent(in) :: isidentical,isfillpatch
+my_amr_mod.F90:    if(isfillpatch.eqv..true.)then
+my_amr_mod.F90:    call fillpatch(lev, time, new_phi_new, varmfab, varmfab_old)
+my_amr_mod.F90:subroutine create_newlevel_and_copy(lev,time,varmfab,varmfab_old,ba,dm,numcomp,ngrow,isidentical,isfillpatch)
+my_amr_mod.F90:    use fillpatch_module, only : fillcoarsepatch
+my_amr_mod.F90:    logical, intent(in) :: isidentical,isfillpatch
+my_amr_mod.F90:    if(isfillpatch.eqv..true.)then
+rhs_helmholtz.F90:  use fillpatch_module
+rhs_helmholtz.F90:       call fillpatch (ilev, time, phi_mp_nbormfab, phi_mp_n, phi_mp_n)
+rhs_helmholtz.F90_jet.bkp:  use fillpatch_module
+rhs_helmholtz.F90_jet.bkp:       call fillpatch (ilev, time, phi_mp_nbormfab, phi_mp_n, phi_mp_n)
+rhs_helmholtz_X.F90:  use fillpatch_module
+rhs_helmholtz_X.F90:       call fillpatch (ilev, time, phi_mp_nbormfab, phi_mp_n, phi_mp_n)
+rhs_helmholtz_Y.F90:  use fillpatch_module
+rhs_helmholtz_Y.F90:       call fillpatch (ilev, time, phi_mp_nbormfab, phi_mp_n, phi_mp_n)

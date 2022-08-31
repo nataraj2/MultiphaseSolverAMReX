@@ -1,10 +1,11 @@
 #ifndef BL_AMRCORE_H_
 #define BL_AMRCORE_H_
-
-#include <ostream>
-#include <memory>
+#include <AMReX_Config.H>
 
 #include <AMReX_AmrMesh.H>
+
+#include <iosfwd>
+#include <memory>
 
 namespace amrex {
 
@@ -37,6 +38,11 @@ public:
              Vector<IntVect> const& ref_ratios,
              Array<int,AMREX_SPACEDIM> const& is_per);
 
+    AmrCore (Geometry const& level_0_geom, AmrInfo const& amr_info);
+
+    AmrCore (AmrCore&& rhs);
+    AmrCore& operator= (AmrCore&& rhs);
+
     AmrCore (const AmrCore& rhs) = delete;
     AmrCore& operator= (const AmrCore& rhs) = delete;
 
@@ -49,7 +55,7 @@ public:
     /**
      * \brief Initialize BoxArray, DistributionMapping and data from scratch.
      * Calling this function requires the derive class implement its own MakeNewLevelFromScratch
-     * to allocate and intialize data.
+     * to allocate and initialize data.
      * Also note usually one needs to average the fine data down to coarse level after this.
      */
     void InitFromScratch (Real time);
@@ -57,12 +63,7 @@ public:
     //! Rebuild levels finer than lbase
     virtual void regrid (int lbase, Real time, bool initial=false);
 
-    static void Initialize ();
-    static void Finalize ();
-
     void printGridSummary (std::ostream& os, int min_lev, int max_lev) const noexcept;
-
-    int Verbose () const noexcept { return verbose; }
 
 protected:
 
@@ -81,8 +82,6 @@ protected:
 
     //! Delete level data
     virtual void ClearLevel (int lev) = 0;
-
-    int              verbose;
 
 #ifdef AMREX_PARTICLES
     std::unique_ptr<AmrParGDB> m_gdb;

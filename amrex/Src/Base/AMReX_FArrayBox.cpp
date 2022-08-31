@@ -1,4 +1,13 @@
 
+#include <AMReX_FArrayBox.H>
+#include <AMReX_FPC.H>
+#include <AMReX_ParmParse.H>
+
+#include <AMReX_BLassert.H>
+#include <AMReX.H>
+#include <AMReX_Utility.H>
+#include <AMReX_MemPool.H>
+
 #include <cstdint>
 #include <cstdlib>
 #include <iostream>
@@ -8,17 +17,6 @@
 #include <cstring>
 #include <limits>
 #include <memory>
-
-#include <AMReX_FArrayBox.H>
-#include <AMReX_FabConv.H>
-#include <AMReX_ParmParse.H>
-#include <AMReX_FabConv.H>
-#include <AMReX_FPC.H>
-
-#include <AMReX_BLassert.H>
-#include <AMReX.H>
-#include <AMReX_Utility.H>
-#include <AMReX_MemPool.H>
 
 namespace amrex {
 
@@ -60,7 +58,7 @@ public:
 
     virtual void skip (std::istream& is,
                        FArrayBox&    f,
-		       int           nCompToSkip) const override;
+                       int           nCompToSkip) const override;
 private:
     virtual void write_header (std::ostream&    os,
                                const FArrayBox& f,
@@ -88,44 +86,11 @@ public:
 
     virtual void skip (std::istream& is,
                        FArrayBox&    f,
-		       int           nCompToSkip) const override;
+                       int           nCompToSkip) const override;
 private:
     virtual void write_header (std::ostream&    os,
                                const FArrayBox& f,
                                int              nvar) const override;
-};
-
-//
-// Our binary FABio type.
-//
-class FABio_binary
-    :
-    public FABio
-{
-public:
-    FABio_binary (RealDescriptor* rd_);
-
-    virtual void read (std::istream& is,
-                       FArrayBox&    fb) const override;
-
-    virtual void write (std::ostream&    os,
-                        const FArrayBox& fb,
-                        int              comp,
-                        int              num_comp) const override;
-
-    virtual void skip (std::istream& is,
-                       FArrayBox&    f) const override;
-
-    virtual void skip (std::istream& is,
-                       FArrayBox&    f,
-		       int           nCompToSkip) const override;
-
-private:
-    virtual void write_header (std::ostream&    os,
-                               const FArrayBox& f,
-                               int              nvar) const override;
-
-    std::unique_ptr<RealDescriptor> realDesc;
 };
 
 //
@@ -179,47 +144,58 @@ FArrayBox::FArrayBox (const Box& b, int ncomp, Real* p) noexcept
 {
 }
 
-FArrayBox&
-FArrayBox::operator= (Real v) noexcept
+FArrayBox::FArrayBox (const Box& b, int ncomp, Real const* p) noexcept
+    : BaseFab<Real>(b,ncomp,p)
 {
-    BaseFab<Real>::operator=(v);
-    return *this;
 }
 
-// Note that initval is not GPU friendly.
 void
 FArrayBox::initVal () noexcept
 {
-    if (init_snan) {
-#ifdef BL_USE_DOUBLE
+    Real * p = dataPtr();
+    Long s = size();
+    if (p && s > 0) {
+        RunOn runon;
 #if defined(AMREX_USE_GPU)
-
-//         double * p = dataPtr();
-//         AMREX_LAUNCH_HOST_DEVICE_LAMBDA (truesize, i,
-//         {
-// #ifdef UINT64_MAX
-//             const uint64_t snan = UINT64_C(0x7ff0000080000001);
-// #else
-//             static_assert(sizeof(double) == sizeof(long long), "sizeof double != sizeof long long");
-//             const long long snan = 0x7ff0000080000001LL;
-// #endif
-//             double* pi = p + i;
-//             std::memcpy(pi, &snan, sizeof(double));
-//         });
-
+        if (Gpu::inLaunchRegion() && arena()->isDeviceAccessible()) {
+            runon = RunOn::Gpu;
+        } else {
+            runon = RunOn::Cpu;
+        }
 #else
-	amrex_array_init_snan(dataPtr(), truesize);
+        runon = RunOn::Cpu;
 #endif
+
+        if (init_snan) {
+#if defined(AMREX_USE_GPU)
+            if (runon == RunOn::Gpu)
+            {
+                amrex::ParallelFor(s, [=] AMREX_GPU_DEVICE (Long i) noexcept
+                {
+                    p[i] = std::numeric_limits<Real>::signaling_NaN();
+                });
+                Gpu::streamSynchronize();
+            }
+            else
 #endif
-    } else if (do_initval) {
-	setVal(initval);
+            {
+                amrex_array_init_snan(p, s);
+            }
+        } else if (do_initval) {
+            const Real x = initval;
+            AMREX_HOST_DEVICE_PARALLEL_FOR_1D_FLAG (runon, s, i,
+            {
+                p[i] = x;
+            });
+            if (runon == RunOn::Gpu) Gpu::streamSynchronize();
+        }
     }
 }
 
 void
-FArrayBox::resize (const Box& b, int N)
+FArrayBox::resize (const Box& b, int N, Arena* ar)
 {
-    BaseFab<Real>::resize(b,N);
+    BaseFab<Real>::resize(b,N,ar);
     initVal();
 }
 
@@ -241,6 +217,29 @@ FArrayBox::setFABio (FABio* rd)
     BL_ASSERT(rd != 0);
     delete fabio;
     fabio = rd;
+}
+
+std::unique_ptr<RealDescriptor>
+FArrayBox::getDataDescriptor ()
+{
+    RealDescriptor *whichRD = nullptr;
+    if (FArrayBox::getFormat() == FABio::FAB_NATIVE) {
+        whichRD = FPC::NativeRealDescriptor().clone();
+    } else if (FArrayBox::getFormat() == FABio::FAB_NATIVE_32) {
+        whichRD = FPC::Native32RealDescriptor().clone();
+    } else if (FArrayBox::getFormat() == FABio::FAB_IEEE_32) {
+        whichRD = FPC::Ieee32NormalRealDescriptor().clone();
+    } else {
+        whichRD = FPC::NativeRealDescriptor().clone(); // to quiet clang static analyzer
+        Abort("FArrayBox::getDataDescriptor(): format not supported. Use NATIVE, NATIVE_32 or IEEE_32");
+    }
+    return std::unique_ptr<RealDescriptor>(whichRD);
+}
+
+std::string
+FArrayBox::getClassName ()
+{
+    return std::string("amrex::FArrayBox");
 }
 
 void
@@ -438,12 +437,12 @@ FArrayBox::Initialize ()
     }
 
     initval = std::numeric_limits<Real>::has_quiet_NaN
-	    ? std::numeric_limits<Real>::quiet_NaN()
-	    : std::numeric_limits<Real>::max();
+            ? std::numeric_limits<Real>::quiet_NaN()
+            : std::numeric_limits<Real>::max();
 
-    pp.query("initval",    initval);
-    pp.query("do_initval", do_initval);
-    pp.query("init_snan", init_snan);
+    pp.queryAdd("initval",    initval);
+    pp.queryAdd("do_initval", do_initval);
+    pp.queryAdd("init_snan", init_snan);
 
     amrex::ExecOnFinalize(FArrayBox::Finalize);
 }
@@ -543,8 +542,8 @@ FABio::read_header (std::istream& is,
 FABio*
 FABio::read_header (std::istream& is,
                     FArrayBox&    f,
-		    int           compIndex,
-		    int&          nCompAvailable)
+                    int           /*compIndex*/,
+                    int&          nCompAvailable)
 {
 //    BL_PROFILE("FArrayBox::read_header_is_i");
     int nvar;
@@ -570,8 +569,8 @@ FABio::read_header (std::istream& is,
         is >> machine;
         is >> bx;
         is >> nvar;
-	nCompAvailable = nvar;
-	nvar = 1;    // make a single component fab
+        nCompAvailable = nvar;
+        nvar = 1;    // make a single component fab
         //
         // Set the FArrayBox to the appropriate size.
         //
@@ -601,8 +600,8 @@ FABio::read_header (std::istream& is,
         is >> *rd;
         is >> bx;
         is >> nvar;
-	nCompAvailable = nvar;
-	nvar = 1;    // make a single component fab
+        nCompAvailable = nvar;
+        nvar = 1;    // make a single component fab
         //
         // Set the FArrayBox to the appropriate size.
         //
@@ -627,7 +626,17 @@ FArrayBox::writeOn (std::ostream& os, int comp, int num_comp) const
     BL_ASSERT(comp >= 0 && num_comp >= 1 && (comp+num_comp) <= nComp());
     fabio->write_header(os, *this, num_comp);
     os.flush();  // 2016-08-30: Titan requires this flush() (probably due to a bug).
-    fabio->write(os, *this, comp, num_comp);
+#ifdef AMREX_USE_GPU
+    if (this->arena()->isManaged() || this->arena()->isDevice()) {
+        FArrayBox hostfab(this->box(), num_comp, The_Pinned_Arena());
+        Gpu::dtoh_memcpy_async(hostfab.dataPtr(), this->dataPtr(comp), hostfab.size()*sizeof(Real));
+        Gpu::streamSynchronize();
+        fabio->write(os, hostfab, 0, num_comp);
+    } else
+#endif
+    {
+        fabio->write(os, *this, comp, num_comp);
+    }
 }
 
 void
@@ -635,7 +644,17 @@ FArrayBox::readFrom (std::istream& is)
 {
 //    BL_PROFILE("FArrayBox::readFrom_is");
     FABio* fabrd = FABio::read_header(is, *this);
-    fabrd->read(is, *this);
+#ifdef AMREX_USE_GPU
+    if (this->arena()->isManaged() || this->arena()->isDevice()) {
+        FArrayBox hostfab(this->box(), this->nComp(), The_Pinned_Arena());
+        fabrd->read(is, hostfab);
+        Gpu::htod_memcpy_async(this->dataPtr(), hostfab.dataPtr(), hostfab.size()*sizeof(Real));
+        Gpu::streamSynchronize();
+    } else
+#endif
+    {
+        fabrd->read(is, *this);
+    }
     delete fabrd;
 }
 
@@ -649,7 +668,17 @@ FArrayBox::readFrom (std::istream& is, int compIndex)
     BL_ASSERT(compIndex >= 0 && compIndex < nCompAvailable);
 
     fabrd->skip(is, *this, compIndex);  // skip data up to the component we want
-    fabrd->read(is, *this);
+#ifdef AMREX_USE_GPU
+    if (this->arena()->isManaged() || this->arena()->isDevice()) {
+        FArrayBox hostfab(this->box(), 1, The_Pinned_Arena());
+        fabrd->read(is, hostfab);
+        Gpu::htod_memcpy_async(this->dataPtr(), hostfab.dataPtr(), hostfab.size()*sizeof(Real));
+        Gpu::streamSynchronize();
+    } else
+#endif
+    {
+        fabrd->read(is, *this);
+    }
     int remainingComponents = nCompAvailable - compIndex - 1;
     fabrd->skip(is, *this, remainingComponents);  // skip to the end
 
@@ -687,7 +716,7 @@ FABio_ascii::write (std::ostream&    os,
         os << p;
         for(int k(0); k < num_comp; ++k) {
             os << "  " << f(p,k+comp);
-	}
+        }
         os << '\n';
     }
     os << '\n';
@@ -718,7 +747,7 @@ FABio_ascii::read (std::istream& is,
         }
         for(int k(0); k < f.nComp(); ++k) {
             is >> f(p, k);
-	}
+        }
     }
 
     if(is.fail()) {
@@ -730,13 +759,23 @@ void
 FABio_ascii::skip (std::istream& is,
                    FArrayBox&    f) const
 {
-    FABio_ascii::read(is, f);
+#ifdef AMREX_USE_GPU
+    if (f.arena()->isManaged() || f.arena()->isDevice()) {
+        FArrayBox hostfab(f.box(), f.nComp(), The_Pinned_Arena());
+        FABio_ascii::read(is, hostfab);
+        Gpu::htod_memcpy_async(f.dataPtr(), hostfab.dataPtr(), f.size()*sizeof(Real));
+        Gpu::streamSynchronize();
+    } else
+#endif
+    {
+        FABio_ascii::read(is, f);
+    }
 }
 
 void
-FABio_ascii::skip (std::istream& is,
-                   FArrayBox&    f,
-		   int           nCompToSkip) const
+FABio_ascii::skip (std::istream& /*is*/,
+                   FArrayBox&    /*f*/,
+                   int           /*nCompToSkip*/) const
 {
     amrex::Error("FABio_ascii::skip(..., int nCompToSkip) not implemented");
 }
@@ -764,18 +803,18 @@ FABio_8bit::write (std::ostream&    os,
 {
     BL_ASSERT(comp >= 0 && num_comp >= 1 && (comp+num_comp) <= f.nComp());
 
-    const Real eps = Real(1.0e-8); // FIXME - whats a better value?
-    const long siz = f.box().numPts();
+    const Real eps = 1.0e-8_rt; // FIXME - what's a better value?
+    const Long siz = f.box().numPts();
 
     unsigned char *c = new unsigned char[siz];
 
     for(int k(0); k < num_comp; ++k) {
-        const Real mn   = f.min(k+comp);
-        const Real mx   = f.max(k+comp);
+        const Real mn   = f.min<RunOn::Host>(k+comp);
+        const Real mx   = f.max<RunOn::Host>(k+comp);
         const Real* dat = f.dataPtr(k+comp);
         Real rng = std::fabs(mx-mn);
-        rng = (rng < eps) ? 0.0 : 255.0/(mx-mn);
-        for(long i(0); i < siz; ++i) {
+        rng = (rng < eps) ? 0.0_rt : 255.0_rt/(mx-mn);
+        for(Long i(0); i < siz; ++i) {
             Real v = rng*(dat[i]-mn);
             int iv = (int) v;
             c[i]   = (unsigned char) iv;
@@ -795,7 +834,7 @@ void
 FABio_8bit::read (std::istream& is,
                   FArrayBox&    f) const
 {
-    long siz         = f.box().numPts();
+    Long siz         = f.box().numPts();
     unsigned char* c = new unsigned char[siz];
 
     Real mn, mx;
@@ -804,11 +843,11 @@ FABio_8bit::read (std::istream& is,
         BL_ASSERT(nbytes == siz);
         while (is.get() != '\n') {
             ;  // ---- do nothing
-	}
+        }
         is.read((char*)c,siz);
         Real* dat       = f.dataPtr(k);
-        const Real rng  = (mx-mn)/255.0;
-        for (long i = 0; i < siz; i++)
+        const Real rng  = (mx-mn)/255.0_rt;
+        for (Long i = 0; i < siz; i++)
         {
             int iv = (int) c[i];
             Real v = (Real) iv;
@@ -827,36 +866,36 @@ FABio_8bit::skip (std::istream& is,
                   FArrayBox&    f) const
 {
     const Box& bx = f.box();
-    long siz      = bx.numPts();
+    Long siz      = bx.numPts();
     Real mn, mx;
     for(int nbytes, k = 0; k < f.nComp(); ++k) {
         is >> mn >> mx >> nbytes;
         BL_ASSERT(nbytes == siz);
         while(is.get() != '\n') {
             ;  // ---- do nothing
-	}
+        }
         is.seekg(siz, std::ios::cur);
     }
 
     if(is.fail()) {
         amrex::Error("FABio_8bit::skip() failed");
-    } 
+    }
 }
 
 void
 FABio_8bit::skip (std::istream& is,
                   FArrayBox&    f,
-		  int           nCompToSkip) const
+                  int           nCompToSkip) const
 {
     const Box& bx = f.box();
-    long siz      = bx.numPts();
+    Long siz      = bx.numPts();
     Real mn, mx;
     for(int nbytes, k = 0; k < nCompToSkip; ++k) {
         is >> mn >> mx >> nbytes;
         BL_ASSERT(nbytes == siz);
         while(is.get() != '\n') {
             ;  // ---- do nothing
-	}
+        }
         is.seekg(siz, std::ios::cur);
     }
 
@@ -895,9 +934,9 @@ FABio_binary::read (std::istream& is,
                     FArrayBox&    f) const
 {
 //    BL_PROFILE("FABio_binary::read");
-    const long base_siz = f.box().numPts();
+    const Long base_siz = f.box().numPts();
     Real* comp_ptr      = f.dataPtr(0);
-    const long siz      = base_siz*f.nComp();
+    const Long siz      = base_siz*f.nComp();
     RealDescriptor::convertToNativeFormat(comp_ptr, siz, is, *realDesc);
     if(is.fail()) {
         amrex::Error("FABio_binary::read() failed");
@@ -913,9 +952,9 @@ FABio_binary::write (std::ostream&    os,
 //    BL_PROFILE("FABio_binary::write");
     BL_ASSERT(comp >= 0 && num_comp >= 1 && (comp+num_comp) <= f.nComp());
 
-    const long base_siz  = f.box().numPts();
+    const Long base_siz  = f.box().numPts();
     const Real* comp_ptr = f.dataPtr(comp);
-    const long siz       = base_siz*num_comp;
+    const Long siz       = base_siz*num_comp;
 
     RealDescriptor::convertFromNativeFormat(os, siz, comp_ptr, *realDesc);
 
@@ -929,8 +968,8 @@ FABio_binary::skip (std::istream& is,
                     FArrayBox&    f) const
 {
     const Box& bx = f.box();
-    long base_siz = bx.numPts();
-    long siz      = base_siz * f.nComp();
+    Long base_siz = bx.numPts();
+    Long siz      = base_siz * f.nComp();
     is.seekg(siz*realDesc->numBytes(), std::ios::cur);
     if(is.fail()) {
         amrex::Error("FABio_binary::skip() failed");
@@ -940,11 +979,11 @@ FABio_binary::skip (std::istream& is,
 void
 FABio_binary::skip (std::istream& is,
                     FArrayBox&    f,
-		    int           nCompToSkip) const
+                    int           nCompToSkip) const
 {
     const Box& bx = f.box();
-    long base_siz = bx.numPts();
-    long siz      = base_siz * nCompToSkip;
+    Long base_siz = bx.numPts();
+    Long siz      = base_siz * nCompToSkip;
     is.seekg(siz*realDesc->numBytes(), std::ios::cur);
     if(is.fail()) {
         amrex::Error("FABio_binary::skip(..., int nCompToSkip) failed");
@@ -956,7 +995,17 @@ operator<< (std::ostream&    os,
             const FArrayBox& f)
 {
     static FABio_ascii fabio_ascii;
-    fabio_ascii.write(os,f,0,f.nComp());
+#ifdef AMREX_USE_GPU
+    if (f.arena()->isManaged() || f.arena()->isDevice()) {
+        FArrayBox hostfab(f.box(), f.nComp(), The_Pinned_Arena());
+        Gpu::dtoh_memcpy_async(hostfab.dataPtr(), f.dataPtr(), f.size()*sizeof(Real));
+        Gpu::streamSynchronize();
+        fabio_ascii.write(os,hostfab,0,f.nComp());
+    } else
+#endif
+    {
+        fabio_ascii.write(os,f,0,f.nComp());
+    }
     return os;
 }
 
@@ -965,7 +1014,17 @@ operator>> (std::istream& is,
             FArrayBox&    f)
 {
     FABio *fabrd = FABio::read_header(is,f);
-    fabrd->read(is,f);
+#ifdef AMREX_USE_GPU
+    if (f.arena()->isManaged() || f.arena()->isDevice()) {
+        FArrayBox hostfab(f.box(), f.nComp(), The_Pinned_Arena());
+        fabrd->read(is,hostfab);
+        Gpu::htod_memcpy_async(f.dataPtr(), hostfab.dataPtr(), f.size()*sizeof(Real));
+        Gpu::streamSynchronize();
+    } else
+#endif
+    {
+        fabrd->read(is,f);
+    }
     delete fabrd;
     return is;
 }

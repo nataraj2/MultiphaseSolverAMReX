@@ -7,7 +7,7 @@
 #include <AMReX_MultiFabUtil.H>
 #include <AMReX_MultiFabUtil_C.H>
 
-#ifdef _OPENMP
+#ifdef AMREX_USE_OMP
 #include <omp.h>
 #endif
 
@@ -26,7 +26,7 @@ extern "C" {
     {
         ParmParse pp("amr");
         int cnt = pp.countval("max_grid_size");
-        int max_grid_size;
+        int max_grid_size = 0;
         if (cnt == 0) {
             max_grid_size = 8;
             pp.add("max_grid_size", max_grid_size);
@@ -40,17 +40,17 @@ extern "C" {
         pp.add("blocking_factor", blocking_factor);
 
         int max_grid_size_x = max_grid_size;
-        pp.query("max_grid_size_x", max_grid_size_x);
+        pp.queryAdd("max_grid_size_x", max_grid_size_x);
         int blocking_factor_x = 2*max_grid_size_x;
         pp.add("blocking_factor_x", blocking_factor_x);
 
         int max_grid_size_y = max_grid_size;
-        pp.query("max_grid_size_y", max_grid_size_y);
+        pp.queryAdd("max_grid_size_y", max_grid_size_y);
         int blocking_factor_y = 2*max_grid_size_y;
         pp.add("blocking_factor_y", blocking_factor_y);
 
         int max_grid_size_z = max_grid_size;
-        pp.query("max_grid_size_z", max_grid_size_z);
+        pp.queryAdd("max_grid_size_z", max_grid_size_z);
         int blocking_factor_z = 2*max_grid_size_z;
         pp.add("blocking_factor_z", blocking_factor_z);
 
@@ -63,7 +63,8 @@ extern "C" {
         pp.addarr("ref_ratio", ref_ratio);
     }
 
-    void amrex_fi_build_octree_leaves (AmrCore* const amrcore, int* n, Vector<treenode>*& leaves)
+    void amrex_fi_build_octree_leaves (AmrCore* const amrcore, int* n, Vector<treenode>*& leaves,
+                                       int* level_offset)
     {
         leaves = new Vector<treenode>;
         const int finest_level = amrcore->finestLevel();
@@ -82,6 +83,8 @@ extern "C" {
 
         for (int lev = 0; lev <= finest_level; ++lev)
         {
+            level_offset[lev] = leaves->size();
+
             famrcore->octree_li_full_to_leaf[lev].clear();
             famrcore->octree_li_leaf_to_full[lev].clear();
 
@@ -94,8 +97,8 @@ extern "C" {
             {
                 famrcore->octree_leaf_grids[lev] = ba;
                 famrcore->octree_leaf_dmap[lev] = dm;
-                famrcore->octree_leaf_dummy_mf[lev].reset
-                    (new MultiFab(ba,dm,1,0,MFInfo().SetAlloc(false)));
+                famrcore->octree_leaf_dummy_mf[lev]
+                    = std::make_unique<MultiFab>(ba,dm,1,0,MFInfo().SetAlloc(false));
 
                 int ilocal = 0;
                 for (int i = 0; i < ngrids; ++i) {
@@ -136,7 +139,7 @@ extern "C" {
                 if (bl.size() == 0) {
                     famrcore->octree_leaf_grids[lev] = BoxArray();
                     famrcore->octree_leaf_dmap[lev] = DistributionMapping();
-                    famrcore->octree_leaf_dummy_mf[lev].reset(new MultiFab());
+                    famrcore->octree_leaf_dummy_mf[lev] = std::make_unique<MultiFab>();
                 } else {
                     bool update_dummy_mf = false;
                     if (famrcore->octree_leaf_grids[lev] != bl.data()) {
@@ -147,13 +150,16 @@ extern "C" {
                         famrcore->octree_leaf_dmap[lev] = DistributionMapping(iproc);
                         update_dummy_mf = true;
                     }
-                    famrcore->octree_leaf_dummy_mf[lev].reset
-                        (new MultiFab(famrcore->octree_leaf_grids[lev],
-                                      famrcore->octree_leaf_dmap[lev],
-                                      1,0,MFInfo().SetAlloc(false)));
+                    if (update_dummy_mf) {
+                        famrcore->octree_leaf_dummy_mf[lev]
+                            = std::make_unique<MultiFab>(famrcore->octree_leaf_grids[lev],
+                                                         famrcore->octree_leaf_dmap[lev],
+                                                         1,0,MFInfo().SetAlloc(false));
+                    }
                 }
             }
         }
+        level_offset[finest_level+1] = leaves->size();
         *n = leaves->size();
     }
 
@@ -161,13 +167,13 @@ extern "C" {
     {
         const int n = leaves->size();
 
-#ifdef _OPENMP
+#ifdef AMREX_USE_OMP
 #pragma omp parallel for
 #endif
         for (int i = 0; i < n; ++i) {
             a_copy[i] = (*leaves)[i];
         }
-        
+
         delete leaves;
     }
 
@@ -191,7 +197,7 @@ extern "C" {
             fgeom.GetVolume(fvolume, lba, ldm, 0);
         }
 
-#ifdef _OPENMP
+#ifdef AMREX_USE_OMP
 #pragma omp parallel if (Gpu::notInLaunchRegion())
 #endif
         for (MFIter mfi(lmf,TilingIfNotGPU()); mfi.isValid(); ++mfi)
@@ -199,18 +205,17 @@ extern "C" {
             const Box& bx = mfi.tilebox();
             Array4<Real> const& crsearr = lmf.array(mfi);
             const int li = li_leaf_to_full[mfi.LocalIndex()];
-            Array4<Real const> const& finearr = fine->atLocalIdx(li).array();
+            Array4<Real const> const& finearr = fine->atLocalIdx(li).const_array();
             if (fgeom.IsCartesian()) {
                 AMREX_LAUNCH_HOST_DEVICE_LAMBDA ( bx, tbx,
                 {
                     amrex_avgdown(tbx,crsearr,finearr,0,scomp,ncomp,rr);
                 });
             } else {
-                Array4<Real const> const& finevolarr = fvolume.array(mfi);
-                AMREX_LAUNCH_HOST_DEVICE_LAMBDA ( bx, tbx,
+                Array4<Real const> const& finevolarr = fvolume.const_array(mfi);
+                AMREX_HOST_DEVICE_PARALLEL_FOR_4D(bx, ncomp, i, j, k, n,
                 {
-                    amrex_avgdown_with_vol(tbx,crsearr,finearr,finevolarr,
-                                           0,scomp,ncomp,rr);
+                    amrex_avgdown_with_vol(i,j,k,n,crsearr,finearr,finevolarr,0,scomp,rr);
                 });
             }
         }

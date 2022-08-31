@@ -1,5 +1,6 @@
 #ifndef AMREX_EB2_IF_SCALE_H_
 #define AMREX_EB2_IF_SCALE_H_
+#include <AMReX_Config.H>
 
 #include <AMReX_EB2_IF_Base.H>
 #include <AMReX_Array.H>
@@ -17,25 +18,27 @@ public:
 
     ScaleIF (F&& a_f, const RealArray& a_scalefactor)
         : m_f(std::move(a_f)),
-          m_sfinv{AMREX_D_DECL(1.0/a_scalefactor[0],
-                               1.0/a_scalefactor[1],
-                               1.0/a_scalefactor[2])}
+#if (AMREX_SPACEDIM == 3)
+          m_sfinv{1.0_rt/a_scalefactor[0], 1.0_rt/a_scalefactor[1], 1.0_rt/a_scalefactor[2]}
+#else
+          m_sfinv{1.0_rt/a_scalefactor[0], 1.0_rt/a_scalefactor[1], 0.0_rt}
+#endif
         {}
     ScaleIF (F const& a_f, const RealArray& a_scalefactor)
         : m_f(a_f),
-          m_sfinv{AMREX_D_DECL(1.0/a_scalefactor[0],
-                               1.0/a_scalefactor[1],
-                               1.0/a_scalefactor[2])}
+#if (AMREX_SPACEDIM == 3)
+          m_sfinv{1.0_rt/a_scalefactor[0], 1.0_rt/a_scalefactor[1], 1.0_rt/a_scalefactor[2]}
+#else
+          m_sfinv{1.0_rt/a_scalefactor[0], 1.0_rt/a_scalefactor[1], 0.0_rt}
+#endif
         {}
-
-    ~ScaleIF () {}
 
     ScaleIF (const ScaleIF& rhs) = default;
     ScaleIF (ScaleIF&& rhs) = default;
     ScaleIF& operator= (const ScaleIF& rhs) = delete;
     ScaleIF& operator= (ScaleIF&& rhs) = delete;
 
-    template <class U=F, class = typename std::enable_if<IsGPUable<U>::value>::type>
+    template <class U=F, typename std::enable_if<IsGPUable<U>::value,int>::type = 0>
     AMREX_GPU_HOST_DEVICE inline
     Real operator() (AMREX_D_DECL(Real x, Real y, Real z)) const noexcept
     {

@@ -13,13 +13,13 @@ public:
 
     void solve ();
     void writePlotfile ();
+    void initData ();
 
 private:
 
     void initializeEB ();
     void readParameters ();
     void initGrids ();
-    void initData ();
 
     int max_level = 0;
     int ref_ratio = 2;
@@ -27,7 +27,7 @@ private:
     int max_grid_size = 64;
     int is_periodic = 0;
     int eb_is_dirichlet = 0;
-    
+
     std::string plot_file_name{"plot"};
 
     amrex::Vector<amrex::Real> scalars;

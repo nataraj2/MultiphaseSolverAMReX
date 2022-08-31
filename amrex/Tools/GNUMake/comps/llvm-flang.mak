@@ -19,10 +19,6 @@ clang_minor_version = $(shell $(CXX) --version | head -1 | sed -e 's/.*version.*
 
 COMP_VERSION = $(clang_version)
 
-DEFINES += -DBL_CLANG_VERSION='$(clang_version)'
-DEFINES += -DBL_CLANG_MAJOR_VERSION='$(clang_major_version)'
-DEFINES += -DBL_CLANG_MINOR_VERSION='$(clang_minor_version)'
-
 ########################################################################
 
 ifeq ($(DEBUG),TRUE)
@@ -44,7 +40,13 @@ endif
 
 ########################################################################
 
-CXXFLAGS += -std=c++11
+ifdef CXXSTD
+  CXXSTD := $(strip $(CXXSTD))
+else
+  CXXSTD := c++14
+endif
+
+CXXFLAGS += -std=$(CXXSTD)
 CFLAGS   += -std=c99
 
 FMODULES = -J$(fmoddir) -I $(fmoddir)
@@ -52,6 +54,12 @@ FMODULES = -J$(fmoddir) -I $(fmoddir)
 ########################################################################
 
 GENERIC_COMP_FLAGS =
+
+ifeq ($(EXPORT_DYNAMIC),TRUE)
+  CPPFLAGS += -DAMREX_EXPORT_DYNAMIC
+  LIBRARIES += -Xlinker -export_dynamic
+  GENERIC_COMP_FLAGS += -fno-omit-frame-pointer -mno-omit-leaf-frame-pointer
+endif
 
 ifeq ($(THREAD_SANITIZER),TRUE)
   GENERIC_COMP_FLAGS += -fsanitize=thread

@@ -1,0 +1,9 @@
+f90EXE_sources += Adv_$(DIM)d.f90
+f90EXE_sources += slope_$(DIM)d.f90
+f90EXE_sources += compute_flux_$(DIM)d.f90
+f90EXE_sources += compute_semilagrangian_flux.f90
+f90EXE_sources += compgeom_lookup.f90
+f90EXE_sources += mod_reconstruct.f90
+f90EXE_sources += plic_mod.f90
+f90EXE_sources += dump_ensight_str.f90
+

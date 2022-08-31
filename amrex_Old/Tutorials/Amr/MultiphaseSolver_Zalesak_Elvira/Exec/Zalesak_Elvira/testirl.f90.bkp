@@ -1,0 +1,27 @@
+program testirl
+use irl_fortran_interface
+type(ObjServer_PlanarLoc_type) :: planar_localizer_allocation
+integer(IRL_LargeOffsetIndex_t) :: heapsize
+integer(kind=8) :: i
+
+  do i = 1, 1000
+  print*, i
+	heapsize =1000
+	call new(planar_localizer_allocation,heapsize)
+  !call sub1
+  enddo
+
+!contains
+
+!subroutine sub1
+
+!use irl_fortran_interface
+!type(ObjServer_PlanarLoc_type) :: planar_localizer_allocation
+!integer(IRL_LargeOffsetIndex_t) :: heapsize
+	
+!	heapsize =1000
+!	call new(planar_localizer_allocation,heapsize)
+
+!end subroutine sub1
+
+end program testirl

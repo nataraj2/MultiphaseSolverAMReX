@@ -1,6 +1,7 @@
 
 #ifndef AMREX_FABSET_H_
 #define AMREX_FABSET_H_
+#include <AMReX_Config.H>
 
 #include <AMReX_MultiFab.H>
 #include <AMReX_Geometry.H>
@@ -63,10 +64,16 @@ public:
     FArrayBox const& operator[] (int i)             const noexcept { return m_mf[i]; }
     FArrayBox      & operator[] (int i)                   noexcept { return m_mf[i]; }
 
-    Array4<Real const> array (const MFIter& mfi) const noexcept { return m_mf.array(mfi); }
+    Array4<Real const> array (const MFIter& mfi) const noexcept { return m_mf.const_array(mfi); }
     Array4<Real      > array (const MFIter& mfi)       noexcept { return m_mf.array(mfi); }
-    Array4<Real const> array (int i)             const noexcept { return m_mf.array(i);   }
+    Array4<Real const> array (int i)             const noexcept { return m_mf.const_array(i);   }
     Array4<Real      > array (int i)                   noexcept { return m_mf.array(i);   }
+    Array4<Real const> const_array (const MFIter& mfi) const noexcept { return m_mf.const_array(mfi); }
+    Array4<Real const> const_array (int i)             const noexcept { return m_mf.const_array(i); }
+
+    MultiArray4<Real const> arrays () const noexcept { return m_mf.const_arrays(); }
+    MultiArray4<Real      > arrays ()       noexcept { return m_mf.arrays(); }
+    MultiArray4<Real const> const_arrays () const noexcept { return m_mf.const_arrays(); }
 
     Box fabbox (int K) const noexcept { return m_mf.fabbox(K); }
 
@@ -75,7 +82,10 @@ public:
     const BoxArray& boxArray () const noexcept { return m_mf.boxArray(); }
 
     const DistributionMapping& DistributionMap () const noexcept
-	{ return m_mf.DistributionMap(); }
+        { return m_mf.DistributionMap(); }
+
+    MultiFab      & multiFab ()       noexcept { return m_mf; }
+    MultiFab const& multiFab () const noexcept { return m_mf; }
 
     int nComp () const noexcept { return m_mf.nComp(); }
 
@@ -89,13 +99,13 @@ public:
     FabSet& plusFrom (const FabSet& src, int scomp, int dcomp, int ncomp);
 
     FabSet& plusFrom (const MultiFab& src, int ngrow, int scomp, int dcomp, int ncomp,
-		      const Periodicity& period = Periodicity::NonPeriodic());
+                      const Periodicity& period = Periodicity::NonPeriodic());
 
     void copyTo (MultiFab& dest, int ngrow, int scomp, int dcomp, int ncomp,
-		 const Periodicity& period = Periodicity::NonPeriodic()) const;
+                 const Periodicity& period = Periodicity::NonPeriodic()) const;
 
     void plusTo (MultiFab& dest, int ngrow, int scomp, int dcomp, int ncomp,
-		 const Periodicity& period = Periodicity::NonPeriodic()) const;
+                 const Periodicity& period = Periodicity::NonPeriodic()) const;
 
     void setVal (Real val);
 
@@ -106,7 +116,7 @@ public:
 
     //!< Linear combination: this := a*mfa + b*mfb
     FabSet& linComb (Real a, const MultiFab& mfa, int a_comp,
-		     Real b, const MultiFab& mfb, int b_comp,
+                     Real b, const MultiFab& mfb, int b_comp,
                      int dcomp, int ncomp, int ngrow);
 
     //
@@ -128,7 +138,7 @@ class FabSetIter
 {
 public:
     explicit FabSetIter (const FabSet& fs)
-	: MFIter(fs.m_mf) { }
+        : MFIter(fs.m_mf) { }
 };
 
 }

@@ -1,5 +1,6 @@
 #ifndef AMREX_ML_ABECLAPLACIAN_H_
 #define AMREX_ML_ABECLAPLACIAN_H_
+#include <AMReX_Config.H>
 
 #include <AMReX_MLCellABecLap.H>
 #include <AMReX_Array.H>
@@ -19,7 +20,17 @@ public:
                      const Vector<BoxArray>& a_grids,
                      const Vector<DistributionMapping>& a_dmap,
                      const LPInfo& a_info = LPInfo(),
-                     const Vector<FabFactory<FArrayBox> const*>& a_factory = {});
+                     const Vector<FabFactory<FArrayBox> const*>& a_factory = {},
+                     const int a_ncomp = 1);
+
+    MLABecLaplacian (const Vector<Geometry>& a_geom,
+                     const Vector<BoxArray>& a_grids,
+                     const Vector<DistributionMapping>& a_dmap,
+                     const Vector<iMultiFab const*>& a_overset_mask, // 1: unknown, 0: known
+                     const LPInfo& a_info = LPInfo(),
+                     const Vector<FabFactory<FArrayBox> const*>& a_factory = {},
+                     const int a_ncomp = 1);
+
     virtual ~MLABecLaplacian ();
 
     MLABecLaplacian (const MLABecLaplacian&) = delete;
@@ -31,11 +42,25 @@ public:
                  const Vector<BoxArray>& a_grids,
                  const Vector<DistributionMapping>& a_dmap,
                  const LPInfo& a_info = LPInfo(),
-                 const Vector<FabFactory<FArrayBox> const*>& a_factory = {});
+                 const Vector<FabFactory<FArrayBox> const*>& a_factory = {},
+                 const int a_ncomp = 1);
+
+    void define (const Vector<Geometry>& a_geom,
+                 const Vector<BoxArray>& a_grids,
+                 const Vector<DistributionMapping>& a_dmap,
+                 const Vector<iMultiFab const*>& a_overset_mask,
+                 const LPInfo& a_info = LPInfo(),
+                 const Vector<FabFactory<FArrayBox> const*>& a_factory = {},
+                 const int a_ncomp = 1);
 
     void setScalars (Real a, Real b) noexcept;
     void setACoeffs (int amrlev, const MultiFab& alpha);
+    void setACoeffs (int amrlev, Real alpha);
     void setBCoeffs (int amrlev, const Array<MultiFab const*,AMREX_SPACEDIM>& beta);
+    void setBCoeffs (int amrlev, Real beta);
+    void setBCoeffs (int amrlev, Vector<Real> const& beta);
+
+    virtual int getNComp () const override { return m_ncomp; }
 
     virtual bool needsUpdate () const override {
         return (m_needs_update || MLCellABecLap::needsUpdate());
@@ -61,17 +86,20 @@ public:
     virtual Array<MultiFab const*,AMREX_SPACEDIM> getBCoeffs (int amrlev, int mglev) const final override
         { return amrex::GetArrOfConstPtrs(m_b_coeffs[amrlev][mglev]); }
 
-    virtual std::unique_ptr<MLLinOp> makeNLinOp (int grid_size) const final override {
-        amrex::Abort("MLABecLaplacian::makeNLinOp: Not implmented");
-        return std::unique_ptr<MLLinOp>{};
-    }
+    virtual std::unique_ptr<MLLinOp> makeNLinOp (int /*grid_size*/) const final override;
 
-    void averageDownCoeffsSameAmrLevel (Vector<MultiFab>& a,
+    virtual bool supportNSolve () const final override;
+
+    virtual void copyNSolveSolution (MultiFab& dst, MultiFab const& src) const final override;
+
+    void averageDownCoeffsSameAmrLevel (int amrlev, Vector<MultiFab>& a,
                                         Vector<Array<MultiFab,AMREX_SPACEDIM> >& b);
     void averageDownCoeffs ();
     void averageDownCoeffsToCoarseAmrLevel (int flev);
 
     void applyMetricTermsCoeffs ();
+
+    void applyRobinBCTermsCoeffs ();
 
     static void FFlux (Box const& box, Real const* dxinv, Real bscalar,
                        Array<FArrayBox const*, AMREX_SPACEDIM> const& bcoef,
@@ -88,6 +116,16 @@ protected:
     Vector<Vector<Array<MultiFab,AMREX_SPACEDIM> > > m_b_coeffs;
 
     Vector<int> m_is_singular;
+
+    virtual bool supportRobinBC () const noexcept override { return true; }
+
+private:
+
+    int m_ncomp = 1;
+
+    void define_ab_coeffs ();
+
+    void update_singular_flags ();
 };
 
 }

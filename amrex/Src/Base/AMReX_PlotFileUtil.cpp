@@ -1,13 +1,16 @@
 
-#include <fstream>
-#include <iomanip>
-
 #include <AMReX_VisMF.H>
+#include <AMReX_AsyncOut.H>
 #include <AMReX_PlotFileUtil.H>
+#include <AMReX_FPC.H>
+#include <AMReX_FabArrayUtility.H>
 
 #ifdef AMREX_USE_EB
 #include <AMReX_EBFabFactory.H>
 #endif
+
+#include <fstream>
+#include <iomanip>
 
 namespace amrex {
 
@@ -29,7 +32,7 @@ std::string LevelFullPath (int level,
 {
     std::string r(plotfilename);
     if ( ! r.empty() && r.back() != '/') {
-	r += '/';
+        r += '/';
     }
     r += LevelPath(level, levelPrefix);  // e.g., plt00005/Level_5
     return r;
@@ -42,7 +45,7 @@ std::string MultiFabFileFullPrefix (int level,
 {
     std::string r(plotfilename);
     if ( ! r.empty() && r.back() != '/') {
-	r += '/';
+        r += '/';
     }
     r += MultiFabHeaderPath(level, levelPrefix, mfPrefix);
     return r;
@@ -51,7 +54,7 @@ std::string MultiFabFileFullPrefix (int level,
 
 void
 PreBuildDirectorHierarchy (const std::string &dirName,
-                           const std::string &subDirPrefix,
+                           const std::string &/*subDirPrefix*/,
                            int nSubDirs, bool callBarrier)
 {
   UtilCreateCleanDirectory(dirName, false);  // ---- dont call barrier
@@ -79,7 +82,7 @@ WriteGenericPlotfileHeader (std::ostream &HeaderFile,
                             const std::string &levelPrefix,
                             const std::string &mfPrefix)
 {
-        BL_PROFILE("WriteGenericPlotfileHeader()");
+//        BL_PROFILE("WriteGenericPlotfileHeader()");
 
         BL_ASSERT(nlevels <= bArray.size());
         BL_ASSERT(nlevels <= geom.size());
@@ -88,63 +91,67 @@ WriteGenericPlotfileHeader (std::ostream &HeaderFile,
 
         int finest_level(nlevels - 1);
 
-	HeaderFile.precision(17);
+        HeaderFile.precision(17);
 
-	// ---- this is the generic plot file type name
+        // ---- this is the generic plot file type name
         HeaderFile << versionName << '\n';
 
         HeaderFile << varnames.size() << '\n';
 
         for (int ivar = 0; ivar < varnames.size(); ++ivar) {
-	    HeaderFile << varnames[ivar] << "\n";
+            HeaderFile << varnames[ivar] << "\n";
         }
         HeaderFile << AMREX_SPACEDIM << '\n';
         HeaderFile << time << '\n';
         HeaderFile << finest_level << '\n';
         for (int i = 0; i < AMREX_SPACEDIM; ++i) {
             HeaderFile << geom[0].ProbLo(i) << ' ';
-	}
+        }
         HeaderFile << '\n';
         for (int i = 0; i < AMREX_SPACEDIM; ++i) {
             HeaderFile << geom[0].ProbHi(i) << ' ';
-	}
+        }
         HeaderFile << '\n';
         for (int i = 0; i < finest_level; ++i) {
             HeaderFile << ref_ratio[i][0] << ' ';
-	}
+        }
         HeaderFile << '\n';
-	for (int i = 0; i <= finest_level; ++i) {
-	    HeaderFile << geom[i].Domain() << ' ';
-	}
+        for (int i = 0; i <= finest_level; ++i) {
+            HeaderFile << geom[i].Domain() << ' ';
+        }
         HeaderFile << '\n';
         for (int i = 0; i <= finest_level; ++i) {
             HeaderFile << level_steps[i] << ' ';
-	}
+        }
         HeaderFile << '\n';
         for (int i = 0; i <= finest_level; ++i) {
             for (int k = 0; k < AMREX_SPACEDIM; ++k) {
                 HeaderFile << geom[i].CellSize()[k] << ' ';
-	    }
+            }
             HeaderFile << '\n';
         }
         HeaderFile << (int) geom[0].Coord() << '\n';
         HeaderFile << "0\n";
 
-	for (int level = 0; level <= finest_level; ++level) {
-	    HeaderFile << level << ' ' << bArray[level].size() << ' ' << time << '\n';
-	    HeaderFile << level_steps[level] << '\n';
+        for (int level = 0; level <= finest_level; ++level) {
+            HeaderFile << level << ' ' << bArray[level].size() << ' ' << time << '\n';
+            HeaderFile << level_steps[level] << '\n';
 
-	    for (int i = 0; i < bArray[level].size(); ++i)
-	    {
-		const Box &b(bArray[level][i]);
-		RealBox loc = RealBox(b, geom[level].CellSize(), geom[level].ProbLo());
-		for (int n = 0; n < AMREX_SPACEDIM; ++n) {
-		    HeaderFile << loc.lo(n) << ' ' << loc.hi(n) << '\n';
-		}
-	    }
+            const IntVect& domain_lo = geom[level].Domain().smallEnd();
+            for (int i = 0; i < bArray[level].size(); ++i)
+            {
+                // Need to shift because the RealBox ctor we call takes the
+                // physical location of index (0,0,0).  This does not affect
+                // the usual cases where the domain index starts with 0.
+                const Box& b = amrex::shift(bArray[level][i], -domain_lo);
+                RealBox loc = RealBox(b, geom[level].CellSize(), geom[level].ProbLo());
+                for (int n = 0; n < AMREX_SPACEDIM; ++n) {
+                    HeaderFile << loc.lo(n) << ' ' << loc.hi(n) << '\n';
+                }
+            }
 
-	    HeaderFile << MultiFabHeaderPath(level, levelPrefix, mfPrefix) << '\n';
-	}
+            HeaderFile << MultiFabHeaderPath(level, levelPrefix, mfPrefix) << '\n';
+        }
 }
 
 
@@ -152,7 +159,8 @@ void
 WriteMultiLevelPlotfile (const std::string& plotfilename, int nlevels,
                          const Vector<const MultiFab*>& mf,
                          const Vector<std::string>& varnames,
-                         const Vector<Geometry>& geom, Real time, const Vector<int>& level_steps,
+                         const Vector<Geometry>& geom, Real time,
+                         const Vector<int>& level_steps,
                          const Vector<IntVect>& ref_ratio,
                          const std::string &versionName,
                          const std::string &levelPrefix,
@@ -169,9 +177,6 @@ WriteMultiLevelPlotfile (const std::string& plotfilename, int nlevels,
 
     int finest_level = nlevels-1;
 
-//    int saveNFiles(VisMF::GetNOutFiles());
-//    VisMF::SetNOutFiles(std::max(1024,saveNFiles));
-
     bool callBarrier(false);
     PreBuildDirectorHierarchy(plotfilename, levelPrefix, nlevels, callBarrier);
     if (!extra_dirs.empty()) {
@@ -182,53 +187,62 @@ WriteMultiLevelPlotfile (const std::string& plotfilename, int nlevels,
     }
     ParallelDescriptor::Barrier();
 
-    if (ParallelDescriptor::IOProcessor()) {
-      VisMF::IO_Buffer io_buffer(VisMF::IO_Buffer_Size);
-      std::string HeaderFileName(plotfilename + "/Header");
-      std::ofstream HeaderFile;
-      HeaderFile.rdbuf()->pubsetbuf(io_buffer.dataPtr(), io_buffer.size());
-      HeaderFile.open(HeaderFileName.c_str(), std::ofstream::out   |
-	                                      std::ofstream::trunc |
-                                              std::ofstream::binary);
-      if( ! HeaderFile.good()) {
-        FileOpenFailed(HeaderFileName);
-      }
+    if (ParallelDescriptor::MyProc() == ParallelDescriptor::NProcs()-1) {
+        Vector<BoxArray> boxArrays(nlevels);
+        for(int level(0); level < boxArrays.size(); ++level) {
+            boxArrays[level] = mf[level]->boxArray();
+        }
 
-      Vector<BoxArray> boxArrays(nlevels);
-      for(int level(0); level < boxArrays.size(); ++level) {
-	boxArrays[level] = mf[level]->boxArray();
-      }
+        auto f = [=]() {
+            VisMF::IO_Buffer io_buffer(VisMF::IO_Buffer_Size);
+            std::string HeaderFileName(plotfilename + "/Header");
+            std::ofstream HeaderFile;
+            HeaderFile.rdbuf()->pubsetbuf(io_buffer.dataPtr(), io_buffer.size());
+            HeaderFile.open(HeaderFileName.c_str(), std::ofstream::out   |
+                                                    std::ofstream::trunc |
+                                                    std::ofstream::binary);
+            if( ! HeaderFile.good()) FileOpenFailed(HeaderFileName);
+            WriteGenericPlotfileHeader(HeaderFile, nlevels, boxArrays, varnames,
+                                       geom, time, level_steps, ref_ratio, versionName,
+                                       levelPrefix, mfPrefix);
+        };
 
-      WriteGenericPlotfileHeader(HeaderFile, nlevels, boxArrays, varnames,
-                                 geom, time, level_steps, ref_ratio, versionName, levelPrefix, mfPrefix);
+        if (AsyncOut::UseAsyncOut()) {
+            AsyncOut::Submit(std::move(f));
+        } else {
+            f();
+        }
     }
-
 
     for (int level = 0; level <= finest_level; ++level)
     {
-        const MultiFab* data;
-        std::unique_ptr<MultiFab> mf_tmp;
-        if (mf[level]->nGrow() > 0) {
-            mf_tmp.reset(new MultiFab(mf[level]->boxArray(),
-                                      mf[level]->DistributionMap(),
-                                      mf[level]->nComp(), 0, MFInfo(),
-                                      mf[level]->Factory()));
-            MultiFab::Copy(*mf_tmp, *mf[level], 0, 0, mf[level]->nComp(), 0);
-            data = mf_tmp.get();
+        if (AsyncOut::UseAsyncOut()) {
+            VisMF::AsyncWrite(*mf[level],
+                              MultiFabFileFullPrefix(level, plotfilename, levelPrefix, mfPrefix),
+                              true);
         } else {
-            data = mf[level];
+            const MultiFab* data;
+            std::unique_ptr<MultiFab> mf_tmp;
+            if (mf[level]->nGrowVect() != 0) {
+                mf_tmp = std::make_unique<MultiFab>(mf[level]->boxArray(),
+                                                    mf[level]->DistributionMap(),
+                                                    mf[level]->nComp(), 0, MFInfo(),
+                                                    mf[level]->Factory());
+                MultiFab::Copy(*mf_tmp, *mf[level], 0, 0, mf[level]->nComp(), 0);
+                data = mf_tmp.get();
+            } else {
+                data = mf[level];
+            }
+            VisMF::Write(*data, MultiFabFileFullPrefix(level, plotfilename, levelPrefix, mfPrefix));
         }
-	VisMF::Write(*data, MultiFabFileFullPrefix(level, plotfilename, levelPrefix, mfPrefix));
     }
-
-//    VisMF::SetNOutFiles(saveNFiles);
 }
 
 // write a plotfile to disk given:
 // -plotfile name
 // -vector of MultiFabs
 // -vector of Geometrys
-// variable names are written as "Var0", "Var1", etc.    
+// variable names are written as "Var0", "Var1", etc.
 // refinement ratio is computed from the Geometry vector
 // "time" and "level_steps" are set to zero
 void WriteMLMF (const std::string &plotfilename,
@@ -259,11 +273,11 @@ void WriteMLMF (const std::string &plotfilename,
 
     // set time to zero
     Real time = 0.;
-    
+
     WriteMultiLevelPlotfile(plotfilename, nlevs, mf, varnames,
-                            geom, time, step_array, ref_ratio);   
-    
-}    
+                            geom, time, step_array, ref_ratio);
+
+}
 
 
 void
@@ -321,8 +335,6 @@ WriteMultiLevelPlotfileHeaders (const std::string & plotfilename, int nlevels,
 
 }
 
-
-
 void
 WriteSingleLevelPlotfile (const std::string& plotfilename,
                           const MultiFab& mf, const Vector<std::string>& varnames,
@@ -340,6 +352,7 @@ WriteSingleLevelPlotfile (const std::string& plotfilename,
     WriteMultiLevelPlotfile(plotfilename, 1, mfarr, varnames, geomarr, time,
                             level_steps, ref_ratio, versionName, levelPrefix, mfPrefix, extra_dirs);
 }
+
 
 #ifdef AMREX_USE_EB
 void
@@ -402,7 +415,7 @@ EB_WriteMultiLevelPlotfile (const std::string& plotfilename, int nlevels,
         std::ofstream HeaderFile;
         HeaderFile.rdbuf()->pubsetbuf(io_buffer.dataPtr(), io_buffer.size());
         HeaderFile.open(HeaderFileName.c_str(), std::ofstream::out   |
-	                                        std::ofstream::trunc |
+                                                std::ofstream::trunc |
                                                 std::ofstream::binary);
         if( ! HeaderFile.good()) {
             FileOpenFailed(HeaderFileName);
@@ -434,7 +447,7 @@ EB_WriteMultiLevelPlotfile (const std::string& plotfilename, int nlevels,
         MultiFab::Copy(mf_tmp, *mf[level], 0, 0, nc, 0);
         auto const& factory = dynamic_cast<EBFArrayBoxFactory const&>(mf[level]->Factory());
         MultiFab::Copy(mf_tmp, factory.getVolFrac(), 0, nc, 1, 0);
-	VisMF::Write(mf_tmp, MultiFabFileFullPrefix(level, plotfilename, levelPrefix, mfPrefix));
+        VisMF::Write(mf_tmp, MultiFabFileFullPrefix(level, plotfilename, levelPrefix, mfPrefix));
     }
 
 //    VisMF::SetNOutFiles(saveNFiles);

@@ -1,6 +1,7 @@
 
 #ifndef AMREX_BNDRYREGISTER_H_
 #define AMREX_BNDRYREGISTER_H_
+#include <AMReX_Config.H>
 
 #include <AMReX_BoxArray.H>
 #include <AMReX_FabSet.H>
@@ -8,38 +9,6 @@
 namespace amrex {
 
 class Orientation;
-
-
-// \cond GENCODE
-struct BndryBATransformer
-    : public BATBase<BndryBATransformer>
-{
-    BndryBATransformer (Orientation face, IndexType typ,
-			int in_rad, int out_rad, int extent_rad);
-
-    virtual ~BndryBATransformer () override {}
-
-    virtual IntVect doiLo () const override { return m_doilo; }
-    virtual IntVect doiHi () const override { return m_doihi; }
-
-    virtual Box operator() (const Box& bx) const override;
-
-    bool operator== (const BndryBATransformer& rhs) const noexcept;
-
-private:
-    int     m_dir;
-    bool    m_lo_face;
-    int     m_in_rad;
-    int     m_out_rad;
-    int     m_extent_rad;
-    // The variables below are derived from the variables above.
-    IntVect m_nodal;
-    IntVect m_loshft;
-    IntVect m_hishft;
-    IntVect m_doilo;
-    IntVect m_doihi;
-};
-// \endcond
 
 /**
 * \brief A BndryRegister organizes FabSets bounding each grid in a BoxArray.
@@ -72,7 +41,7 @@ public:
 
     //! The constructor, given number of cells in/out, extent and number of components (assumes cell-centered boxes, and allocates cell-centered FABs)
     BndryRegister (const BoxArray& grids_,
-		   const DistributionMapping& dmap,
+                   const DistributionMapping& dmap,
                    int             in_rad,
                    int             out_rad,
                    int             extent_rad,
@@ -92,19 +61,19 @@ public:
     BndryRegister& operator= (BndryRegister&& rhs) = delete;
 
     void define (const BoxArray& grids_,
-		 const DistributionMapping& dmap,
-		 int             in_rad,
-		 int             out_rad,
-		 int             extent_rad,
-		 int             ncomp);
+                 const DistributionMapping& dmap,
+                 int             in_rad,
+                 int             out_rad,
+                 int             extent_rad,
+                 int             ncomp);
     //! Build FABs along given face, specifying the DistributionMapping.
     void define (Orientation                face,
-		 IndexType                  typ,
-		 int                        in_rad,
-		 int                        out_rad,
-		 int                        extent_rad,
-		 int                        ncomp,
-		 const DistributionMapping& dm);
+                 IndexType                  typ,
+                 int                        in_rad,
+                 int                        out_rad,
+                 int                        extent_rad,
+                 int                        ncomp,
+                 const DistributionMapping& dm);
 
     void clear ();
 

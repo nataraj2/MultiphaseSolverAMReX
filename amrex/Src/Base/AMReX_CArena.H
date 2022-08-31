@@ -1,5 +1,8 @@
 #ifndef BL_CARENA_H
 #define BL_CARENA_H
+#include <AMReX_Config.H>
+
+#include <AMReX_Arena.H>
 
 #include <cstddef>
 #include <set>
@@ -7,8 +10,7 @@
 #include <mutex>
 #include <unordered_set>
 #include <functional>
-
-#include <AMReX_Arena.H>
+#include <string>
 
 namespace amrex {
 
@@ -33,7 +35,7 @@ public:
 
     CArena (const CArena& rhs) = delete;
     CArena& operator= (const CArena& rhs) = delete;
-    
+
     //! The destructor.
     virtual ~CArena () override;
 
@@ -46,13 +48,36 @@ public:
     */
     virtual void free (void* ap) override final;
 
+    virtual std::size_t freeUnused () override final;
+
+    /**
+     * \brief Does the device have enough free memory for allocating this
+     * much memory?  For CPU builds, this always return true.  This is not a
+     * const funciton because it may attempt to release memory back to the
+     * system.
+     */
+    virtual bool hasFreeDeviceMemory (std::size_t sz) override;
+
     //! The current amount of heap space used by the CArena object.
     std::size_t heap_space_used () const noexcept;
 
+    //! Return the total amount of memory given out via alloc.
+    std::size_t heap_space_actually_used () const noexcept;
+
+    //! Return the amount of memory in this pointer.  Return 0 for unknown pointer.
+    std::size_t sizeOf (void* p) const noexcept;
+
+    void PrintUsage (std::string const& name) const;
+
+    void PrintUsage (std::ostream& os, std::string const& name, std::string const& space) const;
+
     //! The default memory hunk size to grab from the heap.
-    enum { DefaultHunkSize = 1024*1024*8 };
+    constexpr static std::size_t DefaultHunkSize = 1024*1024*8;
 
 protected:
+
+    virtual std::size_t freeUnused_protected () override final;
+
     //! The nodes in our free list and block list.
     class Node
     {
@@ -67,7 +92,7 @@ protected:
             return m_block < rhs.m_block;
         }
 
-        //! The equality operator. 
+        //! The equality operator.
         bool operator== (const Node& rhs) const noexcept
         {
             return m_block == rhs.m_block;
@@ -113,7 +138,7 @@ protected:
     typedef std::set<Node> NL;
 
     //! The list of blocks allocated via ::operator new().
-    std::vector<void*> m_alloc;
+    std::vector<std::pair<void*,std::size_t> > m_alloc;
 
     /**
     * \brief The free list of allocated but not currently used blocks.
@@ -131,6 +156,8 @@ protected:
     std::size_t m_hunk;
     //! The amount of heap space currently allocated.
     std::size_t m_used;
+    //! The amount of memory given out via alloc().
+    std::size_t m_actually_used;
 
     std::mutex carena_mutex;
 };

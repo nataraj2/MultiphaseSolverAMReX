@@ -1,6 +1,5 @@
 
 #include <AMReX_PhysBCFunct.H>
-#include <AMReX_filcc_f.H>
 
 namespace amrex {
 
@@ -53,7 +52,7 @@ CpuBndryFuncFab::operator() (Box const& bx, FArrayBox& dest,
                              const int orig_comp)
 {
     const int* lo = dest.loVect();
-    const Box& domain = geom.Domain();
+    const Box& domain = amrex::convert(geom.Domain(),bx.ixType());
     const int* dom_lo = domain.loVect();
     const Real* dx = geom.CellSize();
     const Real* problo = geom.ProbLo();
@@ -62,9 +61,13 @@ CpuBndryFuncFab::operator() (Box const& bx, FArrayBox& dest,
     {
         xlo[i] = problo[i] + dx[i]*(lo[i]-dom_lo[i]);
     }
-    amrex_fab_filcc(BL_TO_FORTRAN_N_ANYD(dest,dcomp), &numcomp,
-                    BL_TO_FORTRAN_BOX(domain),
-                    dx, xlo, bcr[bcomp].vect());
+    if (bx.ixType().cellCentered()) {
+        fab_filcc(bx, dest.array(dcomp), numcomp, domain, dx, xlo, &(bcr[bcomp]));
+    } else if (bx.ixType().nodeCentered()) {
+        fab_filnd(bx, dest.array(dcomp), numcomp, domain, dx, xlo, &(bcr[bcomp]));
+    } else {
+        fab_filfc(bx, dest.array(dcomp), numcomp, domain, dx, xlo, &(bcr[bcomp]));
+    }
 
     if (f_user != nullptr)
     {

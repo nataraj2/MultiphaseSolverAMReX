@@ -1,14 +1,15 @@
 
 #ifndef BL_BOXLIST_H
 #define BL_BOXLIST_H
-
-#include <iosfwd>
+#include <AMReX_Config.H>
 
 #include <AMReX_IntVect.H>
 #include <AMReX_IndexType.H>
 #include <AMReX_Box.H>
 #include <AMReX_Array.H>
 #include <AMReX_Vector.H>
+
+#include <iosfwd>
 
 namespace amrex
 {
@@ -105,7 +106,7 @@ public:
     //! Remove all Boxes from this BoxList.
     void clear ();
     //! The number of Boxes in this BoxList.
-    long size () const noexcept { return m_lbox.size(); }
+    Long size () const noexcept { return m_lbox.size(); }
 
     std::size_t capacity () const noexcept { return m_lbox.capacity(); }
 
@@ -139,11 +140,13 @@ public:
     //! Remove empty Boxes from this BoxList.
     BoxList& removeEmpty();
 
-    BoxList& complementIn (const Box&     b,
-                           const BoxList& bl);
-    BoxList& complementIn (const Box&     b,
-                            BoxList&&     bl);
+    BoxList& complementIn (const Box& b, const BoxList& bl);
+    BoxList& complementIn (const Box& b, BoxList&& bl);
     BoxList& complementIn (const Box& b, const BoxArray& ba);
+    BoxList& parallelComplementIn (const Box& b, const BoxList& bl);
+    BoxList& parallelComplementIn (const Box& b, BoxList&& bl);
+    BoxList& parallelComplementIn (const Box& b, const BoxArray& ba);
+
     //! Refine each Box in the BoxList by the ratio.
     BoxList& refine (int ratio);
     //! Refine each Box in the BoxList by the ratio.
@@ -173,6 +176,8 @@ public:
     * is O(N-squared) while the other algorithm is O(N).
     */
     int simplify (bool best = false);
+    //! Assuming the boxes are nicely ordered
+    int ordered_simplify ();
     //! Forces each Box in the BoxList to have sides of length <= chunk.
     BoxList& maxSize (int chunk);
     //! Forces each Box in the BoxList to have dimth side of length <= chunk[dim].
@@ -201,18 +206,20 @@ public:
     BoxList& convert (IndexType typ) noexcept;
 
     //! Returns a reference to the Vector<Box>.
-    Vector<Box>& data() noexcept { return m_lbox; }
+    Vector<Box>& data () noexcept { return m_lbox; }
     //! Returns a constant reference to the Vector<Box>.
-    const Vector<Box>& data() const noexcept { return m_lbox; }
+    const Vector<Box>& data () const noexcept { return m_lbox; }
 
     void swap (BoxList& rhs) {
-	std::swap(m_lbox, rhs.m_lbox);
-	std::swap(btype, rhs.btype);
+        std::swap(m_lbox, rhs.m_lbox);
+        std::swap(btype, rhs.btype);
     }
+
+    void Bcast ();
 
 private:
     //! Core simplify routine.
-    int simplify_doit (bool best);
+    int simplify_doit (int depth);
 
     //! The list of Boxes.
     Vector<Box> m_lbox;

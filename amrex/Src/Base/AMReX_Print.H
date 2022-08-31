@@ -1,55 +1,74 @@
 #ifndef AMREX_PRINT_H_
 #define AMREX_PRINT_H_
-
-#include <sstream>
-#include <fstream>
-#include <iomanip>
+#include <AMReX_Config.H>
 
 #include <AMReX.H>
 #include <AMReX_ParallelContext.H>
 #include <AMReX_ParallelDescriptor.H>
+#include <AMReX_ANSIEscCode.H>
+
+#include <sstream>
+#include <fstream>
+#include <iomanip>
+#include <utility>
 
 namespace amrex
 {
+    template <typename T>
+    std::ostream& operator<< (std::ostream& os, Array<T,AMREX_SPACEDIM> const& a)
+    {
+        os << AMREX_D_TERM( '(' << a[0] , <<
+                            ',' << a[1] , <<
+                            ',' << a[2])  << ')';
+        return os;
+    }
+
+    template <typename T, typename S>
+    std::ostream& operator<<(std::ostream& os, const std::pair<T, S>& v)
+    {
+        os << "(" << v.first << ", " << v.second << ")";
+        return os;
+    }
+
     //! This class provides the user with a few print options
     class Print
     {
     public:
 
-	static constexpr int AllProcs = -1;
+        static constexpr int AllProcs = -1;
 
     /**
     * \brief Print on I/O Processor of the default communicator
-    * Example: Print() << " x = " << x << std::endl;  
+    * Example: Print() << " x = " << x << std::endl;
     */
-	explicit Print (std::ostream& os_ = amrex::OutStream()) 
-	    : rank(ParallelContext::IOProcessorNumberSub())
-	    , comm(ParallelContext::CommunicatorSub())
-	    , os(os_)
-	    { ss.precision(os.precision()); }
+        explicit Print (std::ostream& os_ = amrex::OutStream())
+            : rank(ParallelContext::IOProcessorNumberSub())
+            , comm(ParallelContext::CommunicatorSub())
+            , os(os_)
+            { ss.precision(os.precision()); }
 
     /**
     * \brief Print on all processors of the default communicator
     * Example: Print(Print::AllProcs) << " x = " << x << std::endl;
     */
-	Print (int rank_, std::ostream& os_ = amrex::OutStream())
-	    : rank(rank_)
-	    , comm(ParallelContext::CommunicatorSub())
-	    , os(os_)
-	    { ss.precision(os.precision()); }
+        Print (int rank_, std::ostream& os_ = amrex::OutStream())
+            : rank(rank_)
+            , comm(ParallelContext::CommunicatorSub())
+            , os(os_)
+            { ss.precision(os.precision()); }
 
-    /**   
+    /**
     * \brief Print on process rank_ of communicator comm_
     * Example: Print(rank_, comm_) << " x = " << x << std::endl;
     */
-	Print (int rank_, MPI_Comm comm_, std::ostream& os_ = amrex::OutStream())
-	    : rank(rank_)
-	    , comm(comm_)
-	    , os(os_)
-	    { ss.precision(os.precision()); }
+        Print (int rank_, MPI_Comm comm_, std::ostream& os_ = amrex::OutStream())
+            : rank(rank_)
+            , comm(comm_)
+            , os(os_)
+            { ss.precision(os.precision()); }
 
-	~Print () {
-	    if (rank == AllProcs || rank == ParallelContext::MyProcSub()) {
+        ~Print () {
+            if (rank == AllProcs || rank == ParallelContext::MyProcSub()) {
                 std::ostream * my_os = ParallelContext::OFSPtrSub();
                 if (my_os) {
                     my_os->flush();
@@ -59,21 +78,21 @@ namespace amrex
                 os.flush();
                 os << ss.str();
                 os.flush();
-	    }
-	}
+            }
+        }
 
         Print& SetPrecision(int p) {
             ss.precision(p);
             return *this;
-	}
+        }
 
-	template <typename T>
-	Print& operator<< (const T& x) {
+        template <typename T>
+        Print& operator<< (const T& x) {
             ss << x;
-	    return *this;
-	}
+            return *this;
+        }
 
-        Print& operator<< (        std::basic_ostream<char, std::char_traits<char> >& 
+        Print& operator<< (        std::basic_ostream<char, std::char_traits<char> >&
                            (*func)(std::basic_ostream<char, std::char_traits<char> >&))
         {
             ss << func;
@@ -81,21 +100,21 @@ namespace amrex
         }
 
     private:
-	int rank;
-	MPI_Comm comm;
+        int rank;
+        MPI_Comm comm;
         std::ostream &os;
-	std::ostringstream ss;
+        std::ostringstream ss;
     };
 
     //! Print on all processors of the default communicator
     class AllPrint
-	: public Print
+        : public Print
     {
     public:
         //! Example: AllPrint() << " x = " << x << std::endl;
-	explicit AllPrint (std::ostream& os_ = amrex::OutStream())
-	    : Print(Print::AllProcs, os_) 
-	    {}
+        explicit AllPrint (std::ostream& os_ = amrex::OutStream())
+            : Print(Print::AllProcs, os_)
+            {}
 
     };
 
@@ -104,46 +123,46 @@ namespace amrex
     {
     public:
 
-	static constexpr int AllProcs = -1;
+        static constexpr int AllProcs = -1;
 
-	explicit PrintToFile (const std::string& file_name_) 
-	    : file_name(file_name_)
-            , rank(ParallelDescriptor::IOProcessorNumber())
-	    , comm(ParallelDescriptor::Communicator())
-        { Initialize(); }
-        
-	PrintToFile (const std::string& file_name_, int rank_ ) 
-	    : file_name(file_name_)
-	    , rank(rank_)
-	    , comm(ParallelDescriptor::Communicator())
-        { Initialize(); }
-        
-	PrintToFile (const std::string& file_name_, int rank_, MPI_Comm comm_)
-	    : file_name(file_name_)
-	    , rank(rank_)
-	    , comm(comm_)
+        explicit PrintToFile (const std::string& file_name_)
+            : file_name(file_name_)
+            , rank(ParallelContext::IOProcessorNumberSub())
+            , comm(ParallelContext::CommunicatorSub())
         { Initialize(); }
 
-	~PrintToFile () {
-	    if (rank == AllProcs || rank == ParallelDescriptor::MyProc(comm)) {
-		ofs.flush();
-		ofs << ss.str();
-		ofs.flush();
-	    }
-	}
+        PrintToFile (const std::string& file_name_, int rank_ )
+            : file_name(file_name_)
+            , rank(rank_)
+            , comm(ParallelContext::CommunicatorSub())
+        { Initialize(); }
+
+        PrintToFile (const std::string& file_name_, int rank_, MPI_Comm comm_)
+            : file_name(file_name_)
+            , rank(rank_)
+            , comm(comm_)
+        { Initialize(); }
+
+        ~PrintToFile () {
+            if (rank == AllProcs || rank == ParallelContext::MyProcSub()) {
+                ofs.flush();
+                ofs << ss.str();
+                ofs.flush();
+            }
+        }
 
         PrintToFile& SetPrecision(int p) {
             ss.precision(p);
             return *this;
-	}
+        }
 
-	template <typename T>
-	PrintToFile& operator<< (const T& x) {
+        template <typename T>
+        PrintToFile& operator<< (const T& x) {
             ss << x;
-	    return *this;
-	}
+            return *this;
+        }
 
-        PrintToFile& operator<< (        std::basic_ostream<char, std::char_traits<char> >& 
+        PrintToFile& operator<< (        std::basic_ostream<char, std::char_traits<char> >&
                                  (*func)(std::basic_ostream<char, std::char_traits<char> >&))
         {
             ss << func;
@@ -153,10 +172,11 @@ namespace amrex
     private:
 
         void Initialize() {
-            int my_proc = ParallelDescriptor::MyProc(comm);
+            int my_proc = ParallelContext::MyProcSub();
             if (rank == AllProcs || rank == my_proc) {
-                std::string proc_file_name = file_name + "." + std::to_string(my_proc);
-#ifdef _OPENMP
+                int my_proc_global = ParallelDescriptor::MyProc();
+                std::string proc_file_name = file_name + "." + std::to_string(my_proc_global);
+#ifdef AMREX_USE_OMP
                 proc_file_name += "." + std::to_string(omp_get_thread_num());
 #endif
                 ofs.open(proc_file_name, std::ios_base::app);
@@ -168,21 +188,21 @@ namespace amrex
         }
 
         std::string file_name;
-	int rank;
-	MPI_Comm comm;
+        int rank;
+        MPI_Comm comm;
         std::ofstream ofs;
-	std::ostringstream ss;
+        std::ostringstream ss;
     };
 
     //! Print on all processors of the default communicator
     class AllPrintToFile
-	: public PrintToFile
+        : public PrintToFile
     {
     public:
         //! Example: AllPrint() << " x = " << x << std::endl;
-	explicit AllPrintToFile (const std::string& file_name_)
-	    : PrintToFile(file_name_, Print::AllProcs)
-	    {}
+        explicit AllPrintToFile (const std::string& file_name_)
+            : PrintToFile(file_name_, Print::AllProcs)
+            {}
 
     };
 }

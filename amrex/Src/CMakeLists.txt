@@ -1,30 +1,49 @@
 #
-# Fist, define the library we want to add
+# First, define the library we want to add
 # Think of this as a constructor for object "amrex"
 # In the following, we will use setters to change
 # the properties of this object, like setting the sources,
 # setting the compile definitions and so on
 #
 add_library( amrex )
+add_library( AMReX::amrex ALIAS amrex )
+
+#
+# Setup parallel backends (any type: inter/intra-node)
+#
+include(AMReXParallelBackends)
+
+#
+# Add definitions
+#
+include(AMReXSetDefines)
+
+#
+# Find and link third party libraries if needed
+#
+include(AMReXThirdPartyLibraries)
 
 # Where to store Fortran modules
-set_target_properties( amrex
-   PROPERTIES
-   Fortran_MODULE_DIRECTORY
-   ${PROJECT_BINARY_DIR}/mod_files
-   INTERFACE_INCLUDE_DIRECTORIES
-   $<BUILD_INTERFACE:${PROJECT_BINARY_DIR}/mod_files>
-   )
+if (CMAKE_Fortran_COMPILER_LOADED)
+   set_target_properties( amrex
+      PROPERTIES
+      Fortran_MODULE_DIRECTORY
+      ${PROJECT_BINARY_DIR}/mod_files
+      INTERFACE_INCLUDE_DIRECTORIES
+      $<BUILD_INTERFACE:${PROJECT_BINARY_DIR}/mod_files>
+      )
+endif ()
 
 # Load Flags targets and use them if no user-defined flags is given
 include(AMReXFlagsTargets)
 
-if (NOT CMAKE_Fortran_FLAGS)
+if (CMAKE_Fortran_COMPILER_LOADED AND (NOT CMAKE_Fortran_FLAGS) )
    target_link_libraries(amrex
       PUBLIC
       $<BUILD_INTERFACE:Flags_Fortran>
       )
 endif ()
+
 
 if (NOT CMAKE_CXX_FLAGS)
    target_link_libraries(amrex
@@ -33,7 +52,7 @@ if (NOT CMAKE_CXX_FLAGS)
       )
 endif ()
 
-if (ENABLE_FPE)
+if (AMReX_FPE)
    target_link_libraries(amrex
       PUBLIC
       $<BUILD_INTERFACE:Flags_FPE>
@@ -41,7 +60,7 @@ if (ENABLE_FPE)
 endif ()
 
 # General configuration
-include ( AMReX_Config )
+include( AMReX_Config )
 configure_amrex ()
 
 #
@@ -50,101 +69,109 @@ configure_amrex ()
 add_subdirectory(Base)
 add_subdirectory(Boundary)
 add_subdirectory(AmrCore)
-add_subdirectory(Amr)
 
 #
 # Optional components
 #
-if (ENABLE_EB)
-   if (ENABLE_CUDA AND ( "${NVCC_VERSION_MAJOR}.${NVCC_VERSION_MINOR}" VERSION_EQUAL "9.2") )
+if (AMReX_AMRLEVEL)
+   add_subdirectory(Amr)
+endif ()
+
+if (AMReX_EB)
+   if (  AMReX_CUDA AND
+         ( CMAKE_CUDA_COMPILER_VERSION VERSION_GREATER_EQUAL 9.2) AND
+         ( CMAKE_CUDA_COMPILER_VERSION VERSION_LESS 9.3)  )
       message(FATAL_ERROR "EB component of AMReX is not compatible with CUDA 9.2")
    endif ()
    add_subdirectory(EB)
 endif ()
 
-if (ENABLE_LINEAR_SOLVERS)
+if (AMReX_LINEAR_SOLVERS)
    add_subdirectory(LinearSolvers)
-   target_link_libraries(amrex
-      PUBLIC
-      $<BUILD_INTERFACE:Flags_Fortran_REQUIRED>
-      )
 endif ()
 
-if (ENABLE_FORTRAN_INTERFACES)
+if (AMReX_FORTRAN_INTERFACES)
    add_subdirectory(F_Interfaces)
 endif ()
 
-if (ENABLE_PARTICLES)
+if (AMReX_PARTICLES)
    add_subdirectory(Particle)
 endif ()
 
 #
 # Optional external components
 #
-if (ENABLE_AMRDATA)
+if (AMReX_AMRDATA)
    add_subdirectory(Extern/amrdata)
-   target_link_libraries(amrex
-      PUBLIC
-      $<BUILD_INTERFACE:Flags_Fortran_REQUIRED>
-      )
 endif()
 
-if (ENABLE_PROFPARSER)
-   add_subdirectory(Extern/ProfParser)
+if (AMReX_PROFPARSER)
+    #
+    # Generate BLProfParser.tab.H, BLProfParser.tab.cpp and
+    # BLProfParser.lex.yy.cpp
+    # Must be done here where target "amrex" is defined because
+    # add_custom_command create rules which are seen only within the scope
+    # from which add_custom_command is called
+    #
+    set(_dir ${CMAKE_CURRENT_LIST_DIR}/Extern/ProfParser)
+    set(_odir ${CMAKE_CURRENT_BINARY_DIR})
+    add_custom_command(
+        OUTPUT  ${_dir}/BLProfParser.tab.cpp ${_dir}/BLProfParser.tab.H
+        COMMAND cat   BLProfParser.y $(SED0) $(SED1) > BLProfParserNC.y
+        COMMAND bison --defines=BLProfParser.tab.H
+        --output=BLProfParser.tab.cpp BLProfParserNC.y
+        COMMAND rm    BLProfParserNC.y
+        DEPENDS ${_dir}/BLProfParser.y
+        WORKING_DIRECTORY ${_dir}
+        COMMENT "Generating BLProfParser.tab.H and BLProfParser.tab.cpp" )
+
+    add_custom_command(
+        OUTPUT ${_dir}/BLProfParser.lex.yy.cpp
+        COMMAND flex --outfile=${_dir}/BLProfParser.lex.yy.cpp BLProfParser.l
+        DEPENDS ${_dir}/BLProfParser.l
+        WORKING_DIRECTORY ${_dir}
+        COMMENT "Generating BLProfParser.lex.yy.cpp" )
+
+    target_sources( amrex
+        PRIVATE
+        ${_dir}/BLProfParser.tab.cpp
+        ${_dir}/BLProfParser.lex.yy.cpp
+        ${_dir}/BLProfParser.tab.H
+        )
+    unset(_dir)
+
+    add_subdirectory(Extern/ProfParser)
 endif ()
 
-if (ENABLE_SENSEI_INSITU)
+if (AMReX_SENSEI)
    add_subdirectory(Extern/SENSEI)
 endif ()
 
-if (ENABLE_SUNDIALS)
-   add_subdirectory(Extern/SUNDIALS4)
-endif ()
-
-if (ENABLE_CONDUIT)
+if (AMReX_CONDUIT OR AMReX_ASCENT)
    add_subdirectory(Extern/Conduit)
 endif ()
 
-if (ENABLE_HYPRE)
+if (AMReX_HYPRE OR AMReX_PETSC)
    add_subdirectory(Extern/HYPRE)
 endif ()
 
-find_package(Python)
-#
-# If Python >= 2.7 is available, generate AMReX_BuildInfo.cpp
-# If Python is not available, do not include AMReX_BuildInfo.cpp in library
-# AMReX_Buildinfo.cpp is optional, not required.
-#
-
-if ( Python_Interpreter_FOUND AND (NOT (Python_VERSION VERSION_LESS "2.7") ) )
-   add_custom_command(
-      COMMAND ${Python_EXECUTABLE} ${PROJECT_SOURCE_DIR}/Tools/C_scripts/makebuildinfo_C.py
-      --amrex_home "${PROJECT_SOURCE_DIR}"
-      --COMP ${CMAKE_C_COMPILER_ID} --COMP_VERSION ${CMAKE_C_COMPILER_VERSION}
-      --FCOMP ${CMAKE_Fortran_COMPILER_ID} --FCOMP_VERSION ${CMAKE_C_COMPILER_VERSION}
-      #--GIT ". ${AMREX_GIT}"
-      OUTPUT AMReX_buildInfo.cpp
-      WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-      COMMENT "Generating AMReX_buildInfo.cpp" )
-  
-   target_sources( amrex
-      PRIVATE
-      ${CMAKE_CURRENT_BINARY_DIR}/AMReX_buildInfo.cpp
-      )
+if (AMReX_PETSC)
+   add_subdirectory(Extern/PETSc)
 endif ()
 
-# Add ${PROJECT_SOURCE_DIR}/Tools/C_scripts/ to include set
-# This is because AMReX_buildInfo.H could be used by application code
-# from within the build tree even if AMReX_buildInfo.cpp is not generated
-target_sources( amrex
-   PRIVATE
-   ${PROJECT_SOURCE_DIR}/Tools/C_scripts/AMReX_buildInfo.H
-   )
+if (AMReX_SUNDIALS)
+   add_subdirectory(Extern/SUNDIALS)
+endif ()
 
-target_include_directories(amrex
-   PUBLIC
-   $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/Tools/C_scripts>
-   )
+if (AMReX_HDF5)
+   add_subdirectory(Extern/HDF5)
+endif ()
+
+#
+# Print out summary -- do it here so we already linked all
+# libs at this point
+#
+print_amrex_configuration_summary ()
 
 #
 # Make all headers as PUBLIC HEADERS so that they get installed
@@ -156,17 +183,14 @@ list(FILTER AMREX_PUBLIC_HEADERS INCLUDE REGEX "\\.H")
 set_target_properties( amrex PROPERTIES PUBLIC_HEADER "${AMREX_PUBLIC_HEADERS}")
 
 #
-# If ENABLE_CUDA, make C++ files be compiled as CUDA sources
+# If AMReX_CUDA, C++ files will be compiled as CUDA sources
 #
-if (ENABLE_CUDA)
-   set(AMREX_CUDA_SOURCES ${AMREX_SOURCES})
-   list(FILTER AMREX_CUDA_SOURCES INCLUDE REGEX "\\.cpp")
-   set_source_files_properties(${AMREX_CUDA_SOURCES} PROPERTIES LANGUAGE CUDA )
+if (AMReX_CUDA)
+   setup_target_for_cuda_compilation( amrex )
 endif ()
 
-
 #
-# Install amrex  -- Export
+# Generate config header
 #
-include(AMReXInstallHelpers)
-install_amrex(Flags_CXX Flags_Fortran Flags_FPE)
+include(AMReXGenerateConfigHeader)
+generate_config_header()

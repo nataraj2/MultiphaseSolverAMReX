@@ -1,5 +1,6 @@
 #ifndef AMREX_EB2_IF_DIFFERENCE_H_
 #define AMREX_EB2_IF_DIFFERENCE_H_
+#include <AMReX_Config.H>
 
 #include <AMReX_Array.H>
 #include <AMReX_EB2_IF_Base.H>
@@ -39,8 +40,8 @@ public:
     }
 
     template <class U=F, class V=G,
-              class = typename std::enable_if<IsGPUable<U>::value &&
-                                              IsGPUable<V>::value>::type>
+              typename std::enable_if<IsGPUable<U>::value &&
+                                      IsGPUable<V>::value, int>::type = 0>
     AMREX_GPU_HOST_DEVICE inline
     Real operator() (AMREX_D_DECL(Real x, Real y, Real z)) const noexcept
     {

@@ -57,7 +57,7 @@ ForkJoin::ForkJoin (const Vector<double> &task_rank_pct)
     double accum = 0;
     for (int i = 0; i < ntasks; ++i) {
         accum += task_rank_pct[i];
-        int cur = std::round(rank_n * accum);
+        int cur = std::lround(rank_n * accum);
         task_rank_n[i] = cur - prev;
         prev = cur;
     }
@@ -69,7 +69,7 @@ void
 ForkJoin::init(const Vector<int> &task_rank_n)
 {
     ParmParse pp("forkjoin");
-    pp.query("verbose", flag_verbose);
+    pp.queryAdd("verbose", flag_verbose);
 
     const auto task_n = task_rank_n.size();
     AMREX_ALWAYS_ASSERT_WITH_MESSAGE(task_n > 0,
@@ -303,15 +303,12 @@ ForkJoin::get_dm (const BoxArray& ba, int task_idx, const DistributionMapping& d
             r = ParallelContext::local_to_global_rank(lr);
         }
 
-        dm_vec[task_idx].reset(new DistributionMapping(std::move(pmap)));
+        dm_vec[task_idx] = std::make_unique<DistributionMapping>(std::move(pmap));
 
         if (flag_verbose) {
             amrex::Print() << "    Creating DM for (box array, task id) = ("
                       << ba.getRefID() << ", " << task_idx << ")" << std::endl;
         }
-
-//        amrex::Print() << " xxxxx get_dm " << task_idx << ", " << *dm_vec[task_idx] << "\n";
-
     } else {
         // DM has already been created
         if (flag_verbose) {

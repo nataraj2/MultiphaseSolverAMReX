@@ -1,13 +1,14 @@
 
 #include <AMReX_EB2_MultiGFab.H>
 #include <AMReX_EB2_C.H>
+#include <AMReX_ParmParse.H>
 
 namespace amrex { namespace EB2 {
 
 void
 GFab::buildTypes (EBCellFlagFab& celltype)
 {
-    Array4<Real const> const& s = m_levelset.array();
+    Array4<Real const> const& s = m_levelset.const_array();
     Array4<EBCellFlag> const& cell = celltype.array();
     AMREX_D_TERM(Array4<Type_t> const& fx = m_facetype[0].array();,
                  Array4<Type_t> const& fy = m_facetype[1].array();,
@@ -45,8 +46,7 @@ MultiGFab::getLevelSet ()
 
     for (MFIter mfi(*this); mfi.isValid(); ++mfi) {
         auto& fab = (*this)[mfi].getLevelSet();
-        FArrayBox* p = new FArrayBox(fab.box(),1,fab.dataPtr());
-        r.setFab(mfi,p);
+        r.setFab(mfi, FArrayBox(fab.box(), fab.nComp(), fab.dataPtr()));
     }
 
     return r;

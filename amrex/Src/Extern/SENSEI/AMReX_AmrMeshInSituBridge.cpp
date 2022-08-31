@@ -5,10 +5,10 @@
 #include <AMReX_MultiFab.H>
 #include <AMReX_Vector.H>
 
-#ifdef BL_USE_SENSEI_INSITU
+#ifdef AMREX_USE_SENSEI_INSITU
 #include <chrono>
 #include <AnalysisAdaptor.h>
-#include <timer/Timer.h>
+#include <Profiler.h>
 #include <AMReX_AmrMeshDataAdaptor.H>
 #endif
 
@@ -20,13 +20,13 @@ AmrMeshInSituBridge::update(unsigned int step, double time,
     const std::vector<std::vector<std::string>> &names)
 {
     int ret = 0;
-#if defined(BL_USE_SENSEI_INSITU)
+#if defined(AMREX_USE_SENSEI_INSITU)
     if (doUpdate())
     {
         amrex::Print() << "SENSEI Begin update..." << std::endl;
         auto t0 = std::chrono::high_resolution_clock::now();
 
-        timer::MarkEvent event("AmrMeshInSituBridge::update");
+        sensei::TimeEvent<64> event("AmrMeshInSituBridge::update");
 
         amrex::AmrMeshDataAdaptor *data_adaptor = amrex::AmrMeshDataAdaptor::New();
         if (comm != MPI_COMM_NULL)
@@ -35,7 +35,7 @@ AmrMeshInSituBridge::update(unsigned int step, double time,
         data_adaptor->SetDataSource(mesh, states, names);
         data_adaptor->SetDataTime(time);
         data_adaptor->SetDataTimeStep(step);
-        ret = analysis_adaptor->Execute(data_adaptor) ? 0 : -1;
+        ret = analysis_adaptor->Execute(data_adaptor, nullptr) ? 0 : -1;
         data_adaptor->ReleaseData();
         data_adaptor->Delete();
 

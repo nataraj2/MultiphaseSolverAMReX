@@ -1,5 +1,6 @@
 #ifndef AMREX_ML_TENSOR_OP_H_
 #define AMREX_ML_TENSOR_OP_H_
+#include <AMReX_Config.H>
 
 #include <AMReX_MLABecLaplacian.H>
 #include <AMReX_Array.H>
@@ -32,6 +33,12 @@ public:
                 const Vector<DistributionMapping>& a_dmap,
                 const LPInfo& a_info = LPInfo(),
                 const Vector<FabFactory<FArrayBox> const*>& a_factory = {});
+    MLTensorOp (const Vector<Geometry>& a_geom,
+                const Vector<BoxArray>& a_grids,
+                const Vector<DistributionMapping>& a_dmap,
+                const Vector<iMultiFab const*>& a_overset_mask, // 1: unknown, 0: known
+                const LPInfo& a_info = LPInfo(),
+                const Vector<FabFactory<FArrayBox> const*>& a_factory = {});
     virtual ~MLTensorOp ();
 
     MLTensorOp (const MLTensorOp&) = delete;
@@ -45,8 +52,17 @@ public:
                  const LPInfo& a_info = LPInfo(),
                  const Vector<FabFactory<FArrayBox> const*>& a_factory = {});
 
+    void define (const Vector<Geometry>& a_geom,
+                 const Vector<BoxArray>& a_grids,
+                 const Vector<DistributionMapping>& a_dmap,
+                 const Vector<iMultiFab const*>& a_overset_mask,
+                 const LPInfo& a_info = LPInfo(),
+                 const Vector<FabFactory<FArrayBox> const*>& a_factory = {});
+
     void setShearViscosity (int amrlev, const Array<MultiFab const*,AMREX_SPACEDIM>& eta);
+    void setShearViscosity (int amrlev, Real eta);
     void setBulkViscosity (int amrlev, const Array<MultiFab const*,AMREX_SPACEDIM>& kappa);
+    void setBulkViscosity (int amrlev, Real kappa);
 
     virtual int getNComp () const final override { return AMREX_SPACEDIM; }
 
@@ -61,11 +77,17 @@ public:
     }
 
     virtual void prepareForSolve () final override;
-    virtual bool isSingular (int armlev) const final override { return false; }
+    virtual bool isSingular (int /*armlev*/) const final override { return false; }
     virtual bool isBottomSingular () const final override { return false; }
 
     virtual void apply (int amrlev, int mglev, MultiFab& out, MultiFab& in, BCMode bc_mode,
                         StateMode s_mode, const MLMGBndry* bndry=nullptr) const final override;
+
+    virtual void compFlux (int amrlev, const Array<MultiFab*,AMREX_SPACEDIM>& fluxes,
+                           MultiFab& sol, Location loc) const override;
+
+    void compVelGrad (int amrlev, const Array<MultiFab*,AMREX_SPACEDIM>& fluxes,
+                      MultiFab& sol, Location loc) const;
 
 protected:
 
@@ -79,7 +101,8 @@ protected:
 public: // for cuda
 
     void applyBCTensor (int amrlev, int mglev, MultiFab& vel,
-                        BCMode bc_mode, const MLMGBndry* bndry) const;
+                        BCMode bc_mode, StateMode s_mode, const MLMGBndry* bndry
+                        ) const;
 };
 
 }

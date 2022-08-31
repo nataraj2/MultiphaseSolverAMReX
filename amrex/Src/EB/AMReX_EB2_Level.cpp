@@ -12,7 +12,7 @@ Level::prepareForCoarsening (const Level& rhs, int max_grid_size, IntVect ngrow)
     all_grids.maxSize(max_grid_size);
     FabArray<EBCellFlagFab> cflag(all_grids, DistributionMapping{all_grids}, 1, 1);
     rhs.fillEBCellFlag(cflag, m_geom);
-    
+
     Vector<Box> cut_boxes;
     Vector<Box> covered_boxes;
 
@@ -30,7 +30,7 @@ Level::prepareForCoarsening (const Level& rhs, int max_grid_size, IntVect ngrow)
 
     amrex::AllGatherBoxes(cut_boxes);
     amrex::AllGatherBoxes(covered_boxes);
-    
+
     if (!covered_boxes.empty()) {
         m_covered_grids = BoxArray(BoxList(std::move(covered_boxes)));
     }
@@ -43,7 +43,7 @@ Level::prepareForCoarsening (const Level& rhs, int max_grid_size, IntVect ngrow)
 
     m_levelset.define(amrex::convert(m_grids,IntVect::TheNodeVector()), m_dmap, 1, 0);
     rhs.fillLevelSet(m_levelset, m_geom);
-    
+
 //    m_mgf.define(m_grids, m_dmap);
     const int ng = 2;
     m_cellflag.define(m_grids, m_dmap, 1, ng);
@@ -69,9 +69,12 @@ Level::prepareForCoarsening (const Level& rhs, int max_grid_size, IntVect ngrow)
                                 m_dmap, 1, ng);
         m_facecent[idim].define(amrex::convert(m_grids, IntVect::TheDimensionVector(idim)),
                                 m_dmap, AMREX_SPACEDIM-1, ng);
+        IntVect edge_type{1}; edge_type[idim] = 0;
+        m_edgecent[idim].define(amrex::convert(m_grids, edge_type), m_dmap, 1, ng);
     }
     rhs.fillAreaFrac(amrex::GetArrOfPtrs(m_areafrac), m_geom);
     rhs.fillFaceCent(amrex::GetArrOfPtrs(m_facecent), m_geom);
+    rhs.fillEdgeCent(amrex::GetArrOfPtrs(m_edgecent), m_geom);
 
     m_ok = true;
 }
@@ -94,39 +97,72 @@ Level::coarsenFromFine (Level& fineLevel, bool fill_boundary)
     auto const& f_levelset = fineLevel.m_levelset;
     m_levelset.define(amrex::convert(m_grids,IntVect::TheNodeVector()), m_dmap, 1, 0);
     int mvmc_error = 0;
-#ifdef _OPENMP
-#pragma omp parallel reduction(max:mvmc_error)
-#endif
+
+    if (Gpu::notInLaunchRegion())
     {
-#if (AMREX_SPACEDIM == 3)
-        IArrayBox ncuts;
+#ifdef AMREX_USE_OMP
+#pragma omp parallel reduction(max:mvmc_error)
 #endif
         for (MFIter mfi(m_levelset,true); mfi.isValid(); ++mfi)
         {
             const Box& ccbx = mfi.tilebox(IntVect::TheCellVector());
             const Box& ndbx = mfi.tilebox();
-#if (AMREX_SPACEDIM == 3)
-            ncuts.resize(amrex::surroundingNodes(ccbx),6);
-#endif
+            auto const& crse = m_levelset.array(mfi);
+            auto const& fine = f_levelset.const_array(mfi);
+
+            amrex::LoopConcurrentOnCpu(ndbx,
+            [=] (int i, int j, int k) noexcept
+            {
+                crse(i,j,k) = fine(2*i,2*j,2*k);
+            });
+
             int tile_error = 0;
-            amrex_eb2_check_mvmc(BL_TO_FORTRAN_BOX(ccbx),
-                                 BL_TO_FORTRAN_BOX(ndbx),
-                                 BL_TO_FORTRAN_ANYD(m_levelset[mfi]),
-                                 BL_TO_FORTRAN_ANYD(f_levelset[mfi]),
-#if (AMREX_SPACEDIM == 3)
-                                 BL_TO_FORTRAN_ANYD(ncuts),
-#endif
-                                 &tile_error);
+            amrex::LoopOnCpu(ccbx,
+            [=,&tile_error] (int i, int j, int k) noexcept
+            {
+                int ierror = check_mvmc(i,j,k,fine);
+                tile_error = std::max(tile_error,ierror);
+            });
+
             mvmc_error = std::max(mvmc_error, tile_error);
         }
     }
+    else
+    {
+        ReduceOps<ReduceOpMax> reduce_op;
+        ReduceData<int> reduce_data(reduce_op);
+        using ReduceTuple = typename decltype(reduce_data)::Type;
+
+        for (MFIter mfi(m_levelset); mfi.isValid(); ++mfi)
+        {
+            const Box& ndbx = mfi.validbox();
+            const Box& ccbx = amrex::enclosedCells(ndbx);
+            auto const& crse = m_levelset.array(mfi);
+            auto const& fine = f_levelset.const_array(mfi);
+            reduce_op.eval(ndbx, reduce_data,
+            [=] AMREX_GPU_DEVICE (int i, int j, int k) -> ReduceTuple
+            {
+                crse(i,j,k) = fine(2*i,2*j,2*k);
+                int ierror;
+                if (ccbx.contains(IntVect{AMREX_D_DECL(i,j,k)})) {
+                    ierror = check_mvmc(i,j,k,fine);
+                } else {
+                    ierror = 0;
+                }
+                return {ierror};
+            });
+        }
+        ReduceTuple rv = reduce_data.value(reduce_op);
+        mvmc_error = amrex::max(0, amrex::get<0>(rv));
+    }
+
     {
         bool b = mvmc_error;
         ParallelDescriptor::ReduceBoolOr(b);
         mvmc_error = b;
     }
     if (mvmc_error) return mvmc_error;
-    
+
     const int ng = 2;
     m_cellflag.define(m_grids, m_dmap, 1, ng);
     m_volfrac.define(m_grids, m_dmap, 1, ng);
@@ -139,6 +175,8 @@ Level::coarsenFromFine (Level& fineLevel, bool fill_boundary)
                                 m_dmap, 1, ng);
         m_facecent[idim].define(amrex::convert(m_grids, IntVect::TheDimensionVector(idim)),
                                 m_dmap, AMREX_SPACEDIM-1, ng);
+        IntVect edge_type{1}; edge_type[idim] = 0;
+        m_edgecent[idim].define(amrex::convert(m_grids, edge_type), m_dmap, 1, ng);
     }
 
     auto& f_cellflag = fineLevel.m_cellflag;
@@ -149,6 +187,7 @@ Level::coarsenFromFine (Level& fineLevel, bool fill_boundary)
     MultiFab& f_bndrynorm = fineLevel.m_bndrynorm;
     auto& f_areafrac = fineLevel.m_areafrac;
     auto& f_facecent = fineLevel.m_facecent;
+    auto& f_edgecent = fineLevel.m_edgecent;
 
     if (fill_boundary)
     {
@@ -163,32 +202,48 @@ Level::coarsenFromFine (Level& fineLevel, bool fill_boundary)
         for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
             f_areafrac[idim].FillBoundary(fine_period);
             f_facecent[idim].FillBoundary(fine_period);
+            f_edgecent[idim].FillBoundary(fine_period);
         }
 
         if (!fine_covered_grids.empty())
         {
             const std::vector<IntVect>& pshifts = fine_period.shiftIntVect();
-            
-#ifdef _OPENMP
-#pragma omp parallel
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (Gpu::notInLaunchRegion())
 #endif
             {
                 std::vector<std::pair<int,Box> > isects;
                 for (MFIter mfi(f_volfrac); mfi.isValid(); ++mfi)
                 {
                     const Box& bx = mfi.fabbox();
+                    auto const& vfrac = f_volfrac.array(mfi);
+                    auto const& cflag = f_cellflag.array(mfi);
+                    AMREX_D_TERM(auto const& apx = f_areafrac[0].array(mfi);,
+                                 auto const& apy = f_areafrac[1].array(mfi);,
+                                 auto const& apz = f_areafrac[2].array(mfi););
+
                     for (const auto& iv : pshifts)
                     {
                         fine_covered_grids.intersections(bx+iv, isects);
                         for (const auto& is : isects)
                         {
-                            Box ibox = is.second - iv;
-                            f_volfrac[mfi].setVal(0.0, ibox, 0, 1);
-                            f_cellflag[mfi].setVal(EBCellFlag::TheCoveredCell(), ibox, 0, 1);
-                            for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
-                                const Box& fbx = amrex::surroundingNodes(ibox,idim);
-                                f_areafrac[idim].setVal(0.0, fbx, 0, 1);
-                            }
+                            Box const& ibox = is.second - iv;
+                            Box const& indbox = amrex::surroundingNodes(ibox);
+                            AMREX_D_TERM(auto const& xbx = amrex::surroundingNodes(ibox,0);,
+                                         auto const& ybx = amrex::surroundingNodes(ibox,1);,
+                                         auto const& zbx = amrex::surroundingNodes(ibox,2););
+                            AMREX_HOST_DEVICE_FOR_3D(indbox, i,j,k,
+                            {
+                                IntVect cell(AMREX_D_DECL(i,j,k));
+                                if (ibox.contains(cell)) {
+                                    vfrac(i,j,k) = 0.0;
+                                    cflag(i,j,k) = EBCellFlag::TheCoveredCell();
+                                }
+                                AMREX_D_TERM(if (xbx.contains(cell)) apx(i,j,k) = 0.0;,
+                                             if (ybx.contains(cell)) apy(i,j,k) = 0.0;,
+                                             if (zbx.contains(cell)) apz(i,j,k) = 0.0;);
+                            });
                         }
                     }
                 }
@@ -197,71 +252,136 @@ Level::coarsenFromFine (Level& fineLevel, bool fill_boundary)
     }
 
     int error = 0;
-#ifdef _OPENMP
+
+    if (Gpu::notInLaunchRegion())
+    {
+#ifdef AMREX_USE_OMP
 #pragma omp parallel reduction(max:error)
 #endif
-    for (MFIter mfi(m_volfrac,true); mfi.isValid(); ++mfi)
-    {
-        // default
+        for (MFIter mfi(m_volfrac,true); mfi.isValid(); ++mfi)
         {
-            const Box& gbx = mfi.growntilebox(2);
-            m_volfrac[mfi].setVal(1.0, gbx, 0, 1);
-            m_centroid[mfi].setVal(0.0, gbx, 0, AMREX_SPACEDIM);
-            m_bndryarea[mfi].setVal(0.0, gbx, 0, 1);
-            m_bndrycent[mfi].setVal(-1.0, gbx, 0, AMREX_SPACEDIM);
-            m_bndrynorm[mfi].setVal(0.0, gbx, 0, AMREX_SPACEDIM);
-            for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
-                const Box& fbx = mfi.grownnodaltilebox(idim,2);
-                m_areafrac[idim][mfi].setVal(1.0, fbx, 0, 1);
-                m_facecent[idim][mfi].setVal(0.0, fbx, 0, AMREX_SPACEDIM-1);
-            }
+            auto const& cvol = m_volfrac.array(mfi);
+            auto const& ccent = m_centroid.array(mfi);
+            auto const& cba = m_bndryarea.array(mfi);
+            auto const& cbc = m_bndrycent.array(mfi);
+            auto const& cbn = m_bndrynorm.array(mfi);
+            AMREX_D_TERM(auto const& capx = m_areafrac[0].array(mfi);,
+                         auto const& capy = m_areafrac[1].array(mfi);,
+                         auto const& capz = m_areafrac[2].array(mfi););
+            AMREX_D_TERM(auto const& cfcx = m_facecent[0].array(mfi);,
+                         auto const& cfcy = m_facecent[1].array(mfi);,
+                         auto const& cfcz = m_facecent[2].array(mfi););
+            AMREX_D_TERM(auto const& cecx = m_edgecent[0].array(mfi);,
+                         auto const& cecy = m_edgecent[1].array(mfi);,
+                         auto const& cecz = m_edgecent[2].array(mfi););
+            auto const& cflag = m_cellflag.array(mfi);
+
+            auto const& fvol = f_volfrac.const_array(mfi);
+            auto const& fcent = f_centroid.const_array(mfi);
+            auto const& fba = f_bndryarea.const_array(mfi);
+            auto const& fbc = f_bndrycent.const_array(mfi);
+            auto const& fbn = f_bndrynorm.const_array(mfi);
+            AMREX_D_TERM(auto const& fapx = f_areafrac[0].const_array(mfi);,
+                         auto const& fapy = f_areafrac[1].const_array(mfi);,
+                         auto const& fapz = f_areafrac[2].const_array(mfi););
+            AMREX_D_TERM(auto const& ffcx = f_facecent[0].const_array(mfi);,
+                         auto const& ffcy = f_facecent[1].const_array(mfi);,
+                         auto const& ffcz = f_facecent[2].const_array(mfi););
+            AMREX_D_TERM(auto const& fecx = f_edgecent[0].const_array(mfi);,
+                         auto const& fecy = f_edgecent[1].const_array(mfi);,
+                         auto const& fecz = f_edgecent[2].const_array(mfi););
+            auto const& fflag = f_cellflag.const_array(mfi);
+
+            Box const& bx = mfi.validbox();
+            Box const& ndgbx = mfi.grownnodaltilebox(-1,2);
+
+            int tile_error = 0;
+            amrex::LoopOnCpu(ndgbx,
+            [=,&tile_error] (int i, int j, int k) noexcept
+            {
+                amrex::ignore_unused(j,k);
+                int ierr = coarsen_from_fine(AMREX_D_DECL(i,j,k), bx, 2,
+                                             cvol,ccent,cba,cbc,cbn,
+                                             AMREX_D_DECL(capx,capy,capz),
+                                             AMREX_D_DECL(cfcx,cfcy,cfcz),
+                                             AMREX_D_DECL(cecx,cecy,cecz),
+                                             cflag,fvol,fcent,fba,fbc,fbn,
+                                             AMREX_D_DECL(fapx,fapy,fapz),
+                                             AMREX_D_DECL(ffcx,ffcy,ffcz),
+                                             AMREX_D_DECL(fecx,fecy,fecz),
+                                             fflag);
+                tile_error = std::max(tile_error,ierr);
+            });
+
+            error = std::max(error,tile_error);
+        }
+    }
+    else
+    {
+        ReduceOps<ReduceOpMax> reduce_op;
+        ReduceData<int> reduce_data(reduce_op);
+        using ReduceTuple = typename decltype(reduce_data)::Type;
+
+        for (MFIter mfi(m_volfrac); mfi.isValid(); ++mfi)
+        {
+            auto const& cvol = m_volfrac.array(mfi);
+            auto const& ccent = m_centroid.array(mfi);
+            auto const& cba = m_bndryarea.array(mfi);
+            auto const& cbc = m_bndrycent.array(mfi);
+            auto const& cbn = m_bndrynorm.array(mfi);
+            AMREX_D_TERM(auto const& capx = m_areafrac[0].array(mfi);,
+                         auto const& capy = m_areafrac[1].array(mfi);,
+                         auto const& capz = m_areafrac[2].array(mfi););
+            AMREX_D_TERM(auto const& cfcx = m_facecent[0].array(mfi);,
+                         auto const& cfcy = m_facecent[1].array(mfi);,
+                         auto const& cfcz = m_facecent[2].array(mfi););
+            AMREX_D_TERM(auto const& cecx = m_edgecent[0].array(mfi);,
+                         auto const& cecy = m_edgecent[1].array(mfi);,
+                         auto const& cecz = m_edgecent[2].array(mfi););
+            auto const& cflag = m_cellflag.array(mfi);
+
+            auto const& fvol = f_volfrac.const_array(mfi);
+            auto const& fcent = f_centroid.const_array(mfi);
+            auto const& fba = f_bndryarea.const_array(mfi);
+            auto const& fbc = f_bndrycent.const_array(mfi);
+            auto const& fbn = f_bndrynorm.const_array(mfi);
+            AMREX_D_TERM(auto const& fapx = f_areafrac[0].const_array(mfi);,
+                         auto const& fapy = f_areafrac[1].const_array(mfi);,
+                         auto const& fapz = f_areafrac[2].const_array(mfi););
+            AMREX_D_TERM(auto const& ffcx = f_facecent[0].const_array(mfi);,
+                         auto const& ffcy = f_facecent[1].const_array(mfi);,
+                         auto const& ffcz = f_facecent[2].const_array(mfi););
+            AMREX_D_TERM(auto const& fecx = f_edgecent[0].const_array(mfi);,
+                         auto const& fecy = f_edgecent[1].const_array(mfi);,
+                         auto const& fecz = f_edgecent[2].const_array(mfi););
+            auto const& fflag = f_cellflag.const_array(mfi);
+
+            Box const& bx = mfi.validbox();
+            Box const& gbx = amrex::grow(bx,2);
+            Box const& ndgbx = amrex::surroundingNodes(gbx);
+
+            reduce_op.eval(ndgbx, reduce_data,
+            [=] AMREX_GPU_DEVICE (int i, int j, int k) -> ReduceTuple
+            {
+                amrex::ignore_unused(j,k);
+                int ierr = coarsen_from_fine(AMREX_D_DECL(i,j,k), bx, 2,
+                                             cvol,ccent,cba,cbc,cbn,
+                                             AMREX_D_DECL(capx,capy,capz),
+                                             AMREX_D_DECL(cfcx,cfcy,cfcz),
+                                             AMREX_D_DECL(cecx,cecy,cecz),
+                                             cflag,fvol,fcent,fba,fbc,fbn,
+                                             AMREX_D_DECL(fapx,fapy,fapz),
+                                             AMREX_D_DECL(ffcx,ffcy,ffcz),
+                                             AMREX_D_DECL(fecx,fecy,fecz),
+                                             fflag);
+                return {ierr};
+            });
         }
 
-        const Box&  bx = mfi.tilebox();
-        const Box& xbx = mfi.nodaltilebox(0);
-        const Box& ybx = mfi.nodaltilebox(1);
-#if (AMREX_SPACEDIM == 3)
-        const Box& zbx = mfi.nodaltilebox(2);
-#endif
-
-        int tile_error = 0;
-        amrex_eb2_coarsen_from_fine(BL_TO_FORTRAN_BOX( bx),
-                                    BL_TO_FORTRAN_BOX(xbx),
-                                    BL_TO_FORTRAN_BOX(ybx),
-#if (AMREX_SPACEDIM == 3)
-                                    BL_TO_FORTRAN_BOX(zbx),
-#endif
-                                    BL_TO_FORTRAN_ANYD(m_volfrac[mfi]),
-                                    BL_TO_FORTRAN_ANYD(f_volfrac[mfi]),
-                                    BL_TO_FORTRAN_ANYD(m_centroid[mfi]),
-                                    BL_TO_FORTRAN_ANYD(f_centroid[mfi]),
-                                    BL_TO_FORTRAN_ANYD(m_bndryarea[mfi]),
-                                    BL_TO_FORTRAN_ANYD(f_bndryarea[mfi]),
-                                    BL_TO_FORTRAN_ANYD(m_bndrycent[mfi]),
-                                    BL_TO_FORTRAN_ANYD(f_bndrycent[mfi]),
-                                    BL_TO_FORTRAN_ANYD(m_bndrynorm[mfi]),
-                                    BL_TO_FORTRAN_ANYD(f_bndrynorm[mfi]),
-                                    BL_TO_FORTRAN_ANYD(m_areafrac[0][mfi]),
-                                    BL_TO_FORTRAN_ANYD(f_areafrac[0][mfi]),
-                                    BL_TO_FORTRAN_ANYD(m_areafrac[1][mfi]),
-                                    BL_TO_FORTRAN_ANYD(f_areafrac[1][mfi]),
-#if (AMREX_SPACEDIM == 3)
-                                    BL_TO_FORTRAN_ANYD(m_areafrac[2][mfi]),
-                                    BL_TO_FORTRAN_ANYD(f_areafrac[2][mfi]),
-#endif
-                                    BL_TO_FORTRAN_ANYD(m_facecent[0][mfi]),
-                                    BL_TO_FORTRAN_ANYD(f_facecent[0][mfi]),
-                                    BL_TO_FORTRAN_ANYD(m_facecent[1][mfi]),
-                                    BL_TO_FORTRAN_ANYD(f_facecent[1][mfi]),
-#if (AMREX_SPACEDIM == 3)
-                                    BL_TO_FORTRAN_ANYD(m_facecent[2][mfi]),
-                                    BL_TO_FORTRAN_ANYD(f_facecent[2][mfi]),
-#endif
-                                    BL_TO_FORTRAN_ANYD(m_cellflag[mfi]),
-                                    BL_TO_FORTRAN_ANYD(f_cellflag[mfi]),
-                                    &tile_error);
-        error = std::max(error,tile_error);
+        ReduceTuple rv = reduce_data.value(reduce_op);
+        error = amrex::max(0, amrex::get<0>(rv));
     }
+
     {
         bool b = error;
         ParallelDescriptor::ReduceBoolOr(b);
@@ -282,20 +402,22 @@ Level::buildCellFlag ()
         m_areafrac[idim].FillBoundary(0,1,{AMREX_D_DECL(1,1,1)},m_geom.periodicity());
     }
 
-#ifdef _OPENMP
-#pragma omp parallel
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (Gpu::notInLaunchRegion())
 #endif
-    for (MFIter mfi(m_cellflag,true); mfi.isValid(); ++mfi)
+    for (MFIter mfi(m_cellflag,TilingIfNotGPU()); mfi.isValid(); ++mfi)
     {
         const Box& bx = mfi.tilebox();
-        amrex_eb2_build_cellflag_from_ap
-            (BL_TO_FORTRAN_BOX(bx),
-             BL_TO_FORTRAN_ANYD(m_areafrac[0][mfi]),
-             BL_TO_FORTRAN_ANYD(m_areafrac[1][mfi]),
-#if (AMREX_SPACEDIM == 3)
-             BL_TO_FORTRAN_ANYD(m_areafrac[2][mfi]),
-#endif
-             BL_TO_FORTRAN_ANYD(m_cellflag[mfi]));
+        auto const& cflag = m_cellflag.array(mfi);
+        AMREX_D_TERM(auto const& apx = m_areafrac[0].const_array(mfi);,
+                     auto const& apy = m_areafrac[1].const_array(mfi);,
+                     auto const& apz = m_areafrac[2].const_array(mfi););
+        AMREX_HOST_DEVICE_FOR_3D ( bx, i, j, k,
+        {
+            amrex::ignore_unused(k);
+            build_cellflag_from_ap(AMREX_D_DECL(i,j,k),
+                                   cflag, AMREX_D_DECL(apx,apy,apz));
+        });
     }
 }
 
@@ -307,33 +429,27 @@ Level::fillEBCellFlag (FabArray<EBCellFlagFab>& cellflag, const Geometry& geom) 
         for (MFIter mfi(cellflag); mfi.isValid(); ++mfi)
         {
             auto& fab = cellflag[mfi];
-            const Box& bx = fab.box();
-            fab.setRegion(bx);
             fab.setType(FabType::regular);
         }
         return;
     }
 
-    cellflag.ParallelCopy(m_cellflag,0,0,1,0,cellflag.nGrow(),geom.periodicity());
+    const int ng = cellflag.nGrow();
+
+    cellflag.ParallelCopy(m_cellflag,0,0,1,0,ng,geom.periodicity());
 
     const std::vector<IntVect>& pshifts = geom.periodicity().shiftIntVect();
 
-    Box gdomain = geom.Domain();
-    for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
-        if (geom.isPeriodic(idim)) {
-            gdomain.grow(idim, cellflag.nGrow());
-        }
-    }
-
     auto cov_val = EBCellFlag::TheCoveredCell();
-#ifdef _OPENMP
-#pragma omp parallel
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (Gpu::notInLaunchRegion())
 #endif
     {
         std::vector<std::pair<int,Box> > isects;
-        for (MFIter mfi(cellflag); mfi.isValid(); ++mfi)
+        for (MFIter mfi(cellflag,MFItInfo().UseDefaultStream()); mfi.isValid(); ++mfi)
         {
             auto& fab = cellflag[mfi];
+            auto const& a = fab.array();
             const Box& bx = fab.box();
             if (!m_covered_grids.empty())
             {
@@ -341,17 +457,23 @@ Level::fillEBCellFlag (FabArray<EBCellFlagFab>& cellflag, const Geometry& geom) 
                 {
                     m_covered_grids.intersections(bx+iv, isects);
                     for (const auto& is : isects) {
-                        fab.setVal(cov_val, is.second-iv, 0, 1);
+                        Box const& ibox = is.second-iv;
+                        AMREX_HOST_DEVICE_PARALLEL_FOR_3D(ibox, i, j, k,
+                        {
+                            a(i,j,k) = cov_val;
+                        });
                     }
                 }
             }
 
-            // fix type and region for each fab
-            const Box& regbx = bx & gdomain;
-            fab.setRegion(regbx);
+            // fix type for each fab
             fab.setType(FabType::undefined);
-            auto typ = fab.getType(regbx);
+            auto typ = fab.getType(bx);
             fab.setType(typ);
+            for (int nshrink = 1; nshrink < ng; ++nshrink) {
+                const Box& b = amrex::grow(bx,-nshrink);
+                fab.getType(b);
+            }
         }
     }
 }
@@ -366,23 +488,25 @@ Level::fillVolFrac (MultiFab& vfrac, const Geometry& geom) const
 
     const std::vector<IntVect>& pshifts = geom.periodicity().shiftIntVect();
 
-    Real cov_val = 0.0; // for covered cells
-
-#ifdef _OPENMP
-#pragma omp parallel
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (Gpu::notInLaunchRegion())
 #endif
     if (!m_covered_grids.empty())
     {
         std::vector<std::pair<int,Box> > isects;
         for (MFIter mfi(vfrac); mfi.isValid(); ++mfi)
         {
-            auto& fab = vfrac[mfi];
-            const Box& bx = fab.box();
+            auto const& fab = vfrac.array(mfi);
+            const Box& bx = mfi.fabbox();
             for (const auto& iv : pshifts)
             {
                 m_covered_grids.intersections(bx+iv, isects);
                 for (const auto& is : isects) {
-                    fab.setVal(cov_val, is.second-iv, 0, 1);
+                    Box const& ibox = is.second-iv;
+                    AMREX_HOST_DEVICE_PARALLEL_FOR_3D(ibox, i, j, k,
+                    {
+                        fab(i,j,k) = 0.0;  // covered cells
+                    });
                 }
             }
         }
@@ -393,16 +517,16 @@ namespace {
     void copyMultiFabToMultiCutFab (MultiCutFab& dstmf, const MultiFab& srcmf)
     {
         const int ncomp = srcmf.nComp();
-#ifdef _OPENMP
+#ifdef AMREX_USE_OMP
 #pragma omp parallel if (Gpu::notInLaunchRegion())
 #endif
         for (MFIter mfi(dstmf.data()); mfi.isValid(); ++mfi)
         {
             if (dstmf.ok(mfi)) {
                 const auto dstfab = dstmf.array(mfi);
-                const auto srcfab = srcmf.array(mfi);
+                const auto srcfab = srcmf.const_array(mfi);
                 const Box& box = mfi.fabbox();
-                AMREX_HOST_DEVICE_FOR_4D (box,ncomp,i,j,k,n,
+                AMREX_HOST_DEVICE_PARALLEL_FOR_4D (box,ncomp,i,j,k,n,
                 {
                     dstfab(i,j,k,n) = srcfab(i,j,k,n);
                 });
@@ -410,7 +534,7 @@ namespace {
         }
     }
 }
-        
+
 void
 Level::fillCentroid (MultiCutFab& centroid, const Geometry& geom) const
 {
@@ -448,7 +572,7 @@ Level::fillBndryArea (MultiCutFab& bndryarea, const Geometry& geom) const
     fillBndryArea(tmp, geom);
     copyMultiFabToMultiCutFab(bndryarea, tmp);
 }
-        
+
 void
 Level::fillBndryArea (   MultiFab& bndryarea, const Geometry& geom) const
 {
@@ -457,7 +581,7 @@ Level::fillBndryArea (   MultiFab& bndryarea, const Geometry& geom) const
         bndryarea.ParallelCopy(m_bndryarea,0,0,1,0,bndryarea.nGrow(),geom.periodicity());
     }
 }
-       
+
 void
 Level::fillBndryCent (MultiCutFab& bndrycent, const Geometry& geom) const
 {
@@ -505,7 +629,7 @@ Level::fillBndryNorm (   MultiFab& bndrynorm, const Geometry& geom) const
                                geom.periodicity());
     }
 }
-        
+
 void
 Level::fillAreaFrac (Array<MultiCutFab*,AMREX_SPACEDIM> const& a_areafrac, const Geometry& geom) const
 {
@@ -529,10 +653,8 @@ Level::fillAreaFrac (Array<MultiCutFab*,AMREX_SPACEDIM> const& a_areafrac, const
 
     const std::vector<IntVect>& pshifts = geom.periodicity().shiftIntVect();
 
-    Real cov_val = 0.0; // for covered cells
-        
-#ifdef _OPENMP
-#pragma omp parallel
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (Gpu::notInLaunchRegion())
 #endif
     if (!m_covered_grids.empty())
     {
@@ -542,13 +664,41 @@ Level::fillAreaFrac (Array<MultiCutFab*,AMREX_SPACEDIM> const& a_areafrac, const
             if (a_areafrac[0]->ok(mfi))
             {
                 const Box& ccbx = amrex::enclosedCells((*a_areafrac[0])[mfi].box());
+                AMREX_D_TERM(auto const& apx = a_areafrac[0]->array(mfi);,
+                             auto const& apy = a_areafrac[1]->array(mfi);,
+                             auto const& apz = a_areafrac[2]->array(mfi););
                 for (const auto& iv : pshifts)
                 {
                     m_covered_grids.intersections(ccbx+iv, isects);
                     for (const auto& is : isects) {
-                        for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
-                            const Box& fbx = amrex::surroundingNodes(is.second-iv,idim);
-                            (*a_areafrac[idim])[mfi].setVal(cov_val, fbx, 0, 1);
+                        if (Gpu::inLaunchRegion()) {
+                            const Box& bx = is.second-iv;
+                            AMREX_D_TERM(const Box& xbx = amrex::surroundingNodes(bx,0);,
+                                         const Box& ybx = amrex::surroundingNodes(bx,1);,
+                                         const Box& zbx = amrex::surroundingNodes(bx,2););
+                            amrex::ParallelFor(AMREX_D_DECL(xbx,ybx,zbx),
+                              [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
+                              {
+                                  apx(i,j,k) = 0.0;
+                              }
+#if (AMREX_SPACEDIM >= 2)
+                            , [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
+                              {
+                                  apy(i,j,k) = 0.0;
+                              }
+#if (AMREX_SPACEDIM == 3)
+                            , [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
+                              {
+                                  apz(i,j,k) = 0.0;
+                              }
+#endif
+#endif
+                            );
+                        } else {
+                            for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
+                                const Box& fbx = amrex::surroundingNodes(is.second-iv,idim);
+                                (*a_areafrac[idim])[mfi].setVal<RunOn::Host>(0.0, fbx, 0, 1);
+                            }
                         }
                     }
                 }
@@ -575,10 +725,8 @@ Level::fillAreaFrac (Array<MultiFab*,AMREX_SPACEDIM> const& a_areafrac, const Ge
 
     const std::vector<IntVect>& pshifts = geom.periodicity().shiftIntVect();
 
-    Real cov_val = 0.0; // for covered cells
-        
-#ifdef _OPENMP
-#pragma omp parallel
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (Gpu::notInLaunchRegion())
 #endif
     if (!m_covered_grids.empty())
     {
@@ -586,13 +734,41 @@ Level::fillAreaFrac (Array<MultiFab*,AMREX_SPACEDIM> const& a_areafrac, const Ge
         for (MFIter mfi(*a_areafrac[0]); mfi.isValid(); ++mfi)
         {
             const Box& ccbx = amrex::enclosedCells((*a_areafrac[0])[mfi].box());
+            AMREX_D_TERM(auto const& apx = a_areafrac[0]->array(mfi);,
+                         auto const& apy = a_areafrac[1]->array(mfi);,
+                         auto const& apz = a_areafrac[2]->array(mfi););
             for (const auto& iv : pshifts)
             {
                 m_covered_grids.intersections(ccbx+iv, isects);
                 for (const auto& is : isects) {
-                    for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
-                        const Box& fbx = amrex::surroundingNodes(is.second-iv,idim);
-                        (*a_areafrac[idim])[mfi].setVal(cov_val, fbx, 0, 1);
+                    if (Gpu::inLaunchRegion()) {
+                        const Box& bx = is.second-iv;
+                        AMREX_D_TERM(const Box& xbx = amrex::surroundingNodes(bx,0);,
+                                     const Box& ybx = amrex::surroundingNodes(bx,1);,
+                                     const Box& zbx = amrex::surroundingNodes(bx,2););
+                        amrex::ParallelFor(AMREX_D_DECL(xbx,ybx,zbx),
+                          [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
+                          {
+                              apx(i,j,k) = 0.0;
+                          }
+#if (AMREX_SPACEDIM >= 2)
+                        , [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
+                          {
+                              apy(i,j,k) = 0.0;
+                          }
+#if (AMREX_SPACEDIM == 3)
+                        , [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
+                          {
+                              apz(i,j,k) = 0.0;
+                          }
+#endif
+#endif
+                        );
+                    } else {
+                        for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
+                            const Box& fbx = amrex::surroundingNodes(is.second-iv,idim);
+                            (*a_areafrac[idim])[mfi].setVal<RunOn::Host>(0.0, fbx, 0, 1);
+                        }
                     }
                 }
             }
@@ -606,7 +782,7 @@ Level::fillFaceCent (Array<MultiCutFab*,AMREX_SPACEDIM> const& a_facecent, const
     if (isAllRegular()) {
         for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
             a_facecent[idim]->setVal(0.0);
-        }        
+        }
         return;
     }
 
@@ -639,6 +815,73 @@ Level::fillFaceCent (Array<MultiFab*,AMREX_SPACEDIM> const& a_facecent, const Ge
 }
 
 void
+Level::fillEdgeCent (Array<MultiCutFab*,AMREX_SPACEDIM> const& a_edgecent, const Geometry& geom) const
+{
+    if (isAllRegular()) {
+        for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
+            a_edgecent[idim]->setVal(1.0);
+        }
+        return;
+    }
+
+    Array<MultiFab,AMREX_SPACEDIM> tmp;
+    for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
+        MultiCutFab const& edgecent = *a_edgecent[idim];
+        tmp[idim].define(edgecent.boxArray(), edgecent.DistributionMap(),
+                         edgecent.nComp(), edgecent.nGrow());
+    }
+
+    fillEdgeCent(GetArrOfPtrs(tmp), geom);
+
+    for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
+        copyMultiFabToMultiCutFab(*a_edgecent[idim], tmp[idim]);
+    }
+}
+
+void
+Level::fillEdgeCent (Array<MultiFab*,AMREX_SPACEDIM> const& a_edgecent, const Geometry& geom) const
+{
+    for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
+        a_edgecent[idim]->setVal(1.0);
+    }
+    if (!isAllRegular()) {
+        for (int idim = 0; idim < AMREX_SPACEDIM; ++idim)
+        {
+            auto& edgecent = *a_edgecent[idim];
+            a_edgecent[idim]->ParallelCopy(m_edgecent[idim],0,0,edgecent.nComp(),
+                                           0,edgecent.nGrow(),geom.periodicity());
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (Gpu::notInLaunchRegion())
+#endif
+            if (!m_covered_grids.empty())
+            {
+                const std::vector<IntVect>& pshifts = geom.periodicity().shiftIntVect();
+                BoxArray const& covered_edge_grids = amrex::convert(m_covered_grids,
+                                                                    edgecent.ixType());
+                std::vector<std::pair<int,Box> > isects;
+                for (MFIter mfi(edgecent); mfi.isValid(); ++mfi)
+                {
+                    auto const& fab = edgecent.array(mfi);
+                    const Box& bx = mfi.fabbox();
+                    for (const auto& iv : pshifts)
+                    {
+                        covered_edge_grids.intersections(bx+iv, isects);
+                        for (const auto& is : isects) {
+                            Box const& ibox = is.second-iv;
+                            AMREX_HOST_DEVICE_PARALLEL_FOR_3D(ibox, i, j, k,
+                            {
+                                fab(i,j,k) = Real(-1.0);  // covered edges
+                            });
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+void
 Level::fillLevelSet (MultiFab& levelset, const Geometry& geom) const
 {
     levelset.setVal(-1.0);
@@ -648,26 +891,29 @@ Level::fillLevelSet (MultiFab& levelset, const Geometry& geom) const
 
     Real cov_val = 1.0; // for covered cells
 
-#ifdef _OPENMP
-#pragma omp parallel
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (Gpu::notInLaunchRegion())
 #endif
     if (!m_covered_grids.empty())
     {
         std::vector<std::pair<int,Box> > isects;
         for (MFIter mfi(levelset); mfi.isValid(); ++mfi)
         {
-            FArrayBox& lsfab = levelset[mfi];
-            const Box& ccbx = amrex::enclosedCells(lsfab.box());
+            const auto& lsfab = levelset.array(mfi);
+            const Box& ccbx = amrex::enclosedCells(mfi.fabbox());
             for (const auto& iv : pshifts)
             {
                 m_covered_grids.intersections(ccbx+iv, isects);
                 for (const auto& is : isects) {
                     const Box& fbx = amrex::surroundingNodes(is.second-iv);
-                    lsfab.setVal(cov_val, fbx, 0, 1);
+                    AMREX_HOST_DEVICE_PARALLEL_FOR_3D(fbx, i, j, k,
+                    {
+                        lsfab(i,j,k) = cov_val;
+                    });
                 }
             }
         }
     }
 }
-        
+
 }}

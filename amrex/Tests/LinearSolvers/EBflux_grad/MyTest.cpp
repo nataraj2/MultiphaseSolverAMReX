@@ -71,15 +71,15 @@ MyTest::solve ()
     const Real tol_rel = reltol;
     const Real tol_abs = 0.0;
     mlmg.solve(amrex::GetVecOfPtrs(phi), amrex::GetVecOfConstPtrs(rhs), tol_rel, tol_abs);
-    mlmg.getFluxes(amrex::GetVecOfArrOfPtrs(flux)); 
+    mlmg.getFluxes(amrex::GetVecOfArrOfPtrs(flux));
     mlmg.getGradSolution(amrex::GetVecOfArrOfPtrs(grad));
     for (int ilev = 0; ilev <= max_level; ++ilev) {
         amrex::VisMF::Write(phi[0], "phi-"+std::to_string(ilev));
     }
     for (int idim = 0; idim < AMREX_SPACEDIM; ++idim)
     {
-        amrex::VisMF::Write(flux[0][idim], "flux-"+std::to_string(idim)); 
-        amrex::VisMF::Write(grad[0][idim], "grad-"+std::to_string(idim)); 
+        amrex::VisMF::Write(flux[0][idim], "flux-"+std::to_string(idim));
+        amrex::VisMF::Write(grad[0][idim], "grad-"+std::to_string(idim));
     }
 }
 
@@ -130,7 +130,7 @@ MyTest::initGrids ()
         grids[ilev].define(domain);
         grids[ilev].maxSize(max_grid_size);
         domain.grow(-n_cell/4);   // fine level cover the middle of the coarse domain
-        domain.refine(ref_ratio); 
+        domain.refine(ref_ratio);
     }
 }
 
@@ -144,15 +144,15 @@ MyTest::initData ()
     rhs.resize(nlevels);
     acoef.resize(nlevels);
     bcoef.resize(nlevels);
-    flux.resize(1); 
-    grad.resize(1); 
+    flux.resize(1);
+    grad.resize(1);
     for (int ilev = 0; ilev < nlevels; ++ilev)
     {
         dmap[ilev].define(grids[ilev]);
         const EB2::IndexSpace& eb_is = EB2::IndexSpace::top();
         const EB2::Level& eb_level = eb_is.getLevel(geom[ilev]);
-        factory[ilev].reset(new EBFArrayBoxFactory(eb_level, geom[ilev], grids[ilev], dmap[ilev],
-                                                   {2,2,2}, EBSupport::full));
+        factory[ilev] = std::make_unique<EBFArrayBoxFactory>
+            (eb_level, geom[ilev], grids[ilev], dmap[ilev], Vector<int>{2,2,2}, EBSupport::full);
 
         phi[ilev].define(grids[ilev], dmap[ilev], 1, 1, MFInfo(), *factory[ilev]);
         rhs[ilev].define(grids[ilev], dmap[ilev], 1, 0, MFInfo(), *factory[ilev]);
@@ -169,18 +169,20 @@ MyTest::initData ()
             bcoef[ilev][idim].setVal(1.0);
         }
 
-        const Real* dx = geom[ilev].CellSize();
+        const auto dx = geom[ilev].CellSizeArray();
 
         // Initialize Dirichlet boundary
         for (MFIter mfi(phi[ilev]); mfi.isValid(); ++mfi)
         {
-            FArrayBox& fab = phi[ilev][mfi];
-            const Box& bx = fab.box();
-            fab.ForEachIV(bx, 0, 1, [=] (Real& p, const IntVect& iv) {
-                    Real rx = (iv[0]+0.5)*dx[0];
-                    Real ry = (iv[1]+0.5)*dx[1];
-                    p = std::sqrt(0.5)*(rx + ry);
-                });
+            const Box& bx = mfi.fabbox();
+            Array4<Real> const& fab = phi[ilev].array(mfi);
+            amrex::ParallelFor(bx,
+            [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
+            {
+                Real rx = (i+0.5)*dx[0];
+                Real ry = (j+0.5)*dx[1];
+                fab(i,j,k) = std::sqrt(0.5)*(rx + ry);
+            });
         }
 
         phi[ilev].setVal(0.0, 0, 1, 0);
@@ -193,4 +195,3 @@ MyTest::initData ()
                                      dmap[0], 1, 0, MFInfo(), *factory[0]);
     }
 }
-

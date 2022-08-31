@@ -1,12 +1,14 @@
 #ifndef AMREX_MULTICUTFAB_H_
 #define AMREX_MULTICUTFAB_H_
+#include <AMReX_Config.H>
 
 #include <AMReX_FabArray.H>
+#include <AMReX_FArrayBox.H>
 #include <AMReX_EBCellFlag.H>
 
 namespace amrex {
 
-class CutFab
+class CutFab final
     : public FArrayBox
 {
 public:
@@ -22,12 +24,10 @@ public:
             bool shared=false, Arena* ar = nullptr)
         : FArrayBox(b, ncomps, alloc, shared, ar) {}
 
-#ifdef AMREX_USE_GPU
     CutFab (CutFab const& rhs, MakeType make_type, int scomp, int ncomp)
         : FArrayBox(rhs, make_type, scomp, ncomp) {}
-#endif
 
-    ~CutFab () = default;
+    virtual ~CutFab () noexcept override = default;
 
     CutFab (CutFab&& rhs) noexcept = default;
 
@@ -35,25 +35,25 @@ public:
     CutFab& operator= (const CutFab&) = delete;
     CutFab& operator= (CutFab&&) = delete;
 
-    AMREX_GPU_HOST_DEVICE
+    template <RunOn run_on, typename BUF = CutFab::value_type>
     std::size_t copyFromMem (const void* src) {
-        return copyFromMem (box(), 0, nComp(), src);
+        return copyFromMem<run_on, BUF>(box(), 0, nComp(), src);
     }
 
-    AMREX_GPU_HOST_DEVICE
+    template <RunOn run_on, typename BUF = CutFab::value_type>
     std::size_t copyFromMem (const Box&  dstbox,
                              int         dstcomp,
                              int         numcomp,
                              const void* src)
     {
         if (dptr != nullptr) {
-            return FArrayBox::copyFromMem(dstbox, dstcomp, numcomp, src);
+            return FArrayBox::copyFromMem<run_on, BUF>(dstbox, dstcomp, numcomp, src);
         } else {
-            return sizeof(CutFab::value_type)*static_cast<std::size_t>(dstbox.numPts()*numcomp);
+            return sizeof(BUF)*static_cast<std::size_t>(dstbox.numPts()*numcomp);
         }
     }
 
-    AMREX_GPU_HOST_DEVICE
+    template <RunOn run_on>
     CutFab& copy (const CutFab & src,
                   const Box&     srcbox,
                   int            srccomp,
@@ -62,16 +62,16 @@ public:
                   int            numcomp)
     {
         if (dptr != nullptr) {
-            FArrayBox::copy(src,srcbox,srccomp,destbox,destcomp,numcomp);
+            FArrayBox::copy<run_on>(src,srcbox,srccomp,destbox,destcomp,numcomp);
         }
         return *this;
     }
 
-    AMREX_GPU_HOST_DEVICE
+    template <RunOn run_on>
     CutFab& copy (const CutFab & src, const Box& bx, SrcComp scomp, DestComp dcomp, NumComps ncomp)
     {
         if (dptr != nullptr) {
-            FArrayBox::copy(src, bx, scomp, dcomp, ncomp);
+            FArrayBox::copy<run_on>(src, bx, scomp, dcomp, ncomp);
         }
         return *this;
     }
@@ -89,7 +89,7 @@ public:
     ~MultiCutFab ();
 
     MultiCutFab (MultiCutFab&& rhs) noexcept = default;
-    
+
     MultiCutFab (const MultiCutFab& rhs) = delete;
     MultiCutFab& operator= (const MultiCutFab& rhs) = delete;
     MultiCutFab& operator= (MultiCutFab&& rhs) = delete;
@@ -100,10 +100,18 @@ public:
     const CutFab& operator[] (const MFIter& mfi) const noexcept;
     CutFab& operator[] (const MFIter& mfi) noexcept;
 
+    const CutFab& operator[] (int global_box_index) const noexcept;
+    CutFab& operator[] (int global_box_index) noexcept;
+
     Array4<Real      > array (const MFIter& mfi) noexcept;
     Array4<Real const> array (const MFIter& mfi) const noexcept;
+    Array4<Real const> const_array (const MFIter& mfi) const noexcept;
 
+    //! Is it OK to call operator[] with this MFIter?
     bool ok (const MFIter& mfi) const noexcept;
+
+    //! Is it OK to call operator[] with this global box index?
+    bool ok (int global_box_index) const noexcept;
 
     void setVal (Real val);
 

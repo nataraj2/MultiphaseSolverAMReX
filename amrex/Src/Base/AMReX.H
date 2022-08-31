@@ -1,17 +1,20 @@
 
 #ifndef BL_AMREX_H
 #define BL_AMREX_H
+#include <AMReX_Config.H>
 
 #include <AMReX_GpuQualifiers.H>
+#include <AMReX_GpuPrint.H>
+#include <AMReX_GpuAssert.H>
 #include <AMReX_ccse-mpi.H>
 #include <AMReX_Exception.H>
+#include <AMReX_Extension.H>
 
-#include <iostream>
 #include <functional>
-#include <string>
-#include <cstdio>
-#include <vector>
+#include <iostream>
 #include <memory>
+#include <string>
+#include <vector>
 
 //
 // Initialize, Finalize, Error Reporting, and Version String Functions
@@ -33,29 +36,31 @@ namespace amrex
     namespace system
     {
 #ifndef AMREX_DEBUG
-	constexpr bool NDebug = true;
+        constexpr bool NDebug = true;
         constexpr bool  Debug = false;
 #else
-	constexpr bool NDebug = false;
+        constexpr bool NDebug = false;
         constexpr bool  Debug = true;
 #endif
 
-	extern std::string exename;
-	
-	extern int verbose;
+        extern AMREX_EXPORT std::string exename;
 
-        extern int signal_handling;
-        extern int call_addr2line;
-        extern int throw_exception;
+        extern AMREX_EXPORT int verbose;
 
-        extern int regtest_reduction;
+        extern AMREX_EXPORT int signal_handling;
+        extern AMREX_EXPORT int call_addr2line;
+        extern AMREX_EXPORT int throw_exception;
 
-        extern std::ostream* osout;
-        extern std::ostream* oserr;
-        
-        extern ErrorHandler error_handler;
+        extern AMREX_EXPORT int regtest_reduction;
+
+        extern AMREX_EXPORT std::ostream* osout;
+        extern AMREX_EXPORT std::ostream* oserr;
+
+        extern AMREX_EXPORT ErrorHandler error_handler;
+        extern AMREX_EXPORT int abort_on_unused_inputs;
     }
 
+    /** the AMReX "git describe" version */
     std::string Version ();
 
     // The returned AMReX* is non-owning! To delete it, call Finalize(AMReX*).
@@ -72,6 +77,13 @@ namespace amrex
                        std::ostream& a_oserr = std::cerr,
                        ErrorHandler a_errorhandler = nullptr);
 
+    /**
+       \brief Returns true if there are any currently-active and initialized
+       AMReX instances (i.e. one for which amrex::Initialize has been called,
+       and amrex::Finalize has not). Otherwise false.
+     */
+    bool Initialized ();
+
     void Finalize (AMReX* pamrex);
     void Finalize (); // Finalize the current top
     /**
@@ -83,39 +95,94 @@ namespace amrex
     void ExecOnFinalize (PTR_TO_VOID_FUNC);
     void ExecOnInitialize (PTR_TO_VOID_FUNC);
 
+    //! This shuts up the compiler about unused variables
+    template <class... Ts>
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    void ignore_unused (const Ts&...) {}
+
     //! Print out message to cerr and exit via amrex::Abort().
-    AMREX_GPU_HOST_DEVICE
-    void Error (const char * msg = 0);
     void Error (const std::string& msg);
 
+    void Error_host (const char* msg);
+
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    void Error (const char* msg = 0) {
+#if AMREX_DEVICE_COMPILE
+#if defined(NDEBUG)
+        amrex::ignore_unused(msg);
+#else
+        if (msg) AMREX_DEVICE_PRINTF("Error %s\n", msg);
+        AMREX_DEVICE_ASSERT(0);
+#endif
+#else
+        Error_host(msg);
+#endif
+    }
+
     //! Print out warning message to cerr.
-    AMREX_GPU_HOST_DEVICE
-    void Warning (const char * msg);
     void Warning (const std::string& msg);
 
+    void Warning_host (const char * msg);
+
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    void Warning (const char * msg) {
+#if AMREX_DEVICE_COMPILE
+#if defined(NDEBUG)
+        amrex::ignore_unused(msg);
+#else
+        if (msg) AMREX_DEVICE_PRINTF("Warning %s\n", msg);
+#endif
+#else
+        Warning_host(msg);
+#endif
+    }
+
     //! Print out message to cerr and exit via abort().
-    AMREX_GPU_HOST_DEVICE
-    void Abort (const char * msg = 0);
     void Abort (const std::string& msg);
+
+    void Abort_host (const char * msg);
+
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    void Abort (const char * msg = 0) {
+#if AMREX_DEVICE_COMPILE
+#if defined(NDEBUG)
+        amrex::ignore_unused(msg);
+#else
+        if (msg) AMREX_DEVICE_PRINTF("Abort %s\n", msg);
+        AMREX_DEVICE_ASSERT(0);
+#endif
+#else
+        Abort_host(msg);
+#endif
+    }
 
     /**
     * \brief Prints assertion failed messages to cerr and exits
     * via abort().  Intended for use by the BL_ASSERT() macro
     * in <AMReX_BLassert.H>.
     */
-    AMREX_GPU_HOST_DEVICE
-    void Assert (const char* EX,
-                 const char* file,
-                 int         line,
-                 const char* msg = nullptr);
-    /**
-    * \brief Prints out an out-of-memory message and aborts.  It is
-    *         called by various routines when a call to new fails.
-    *
-    *        Called as amrex::OutOfMemory(__FILE__, __LINE__);
-    */
-    void OutOfMemory (const char* file,
-                      int         line);
+
+    void Assert_host (const char* EX, const char* file, int line, const char* msg);
+
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    void Assert (const char* EX, const char* file, int line, const char* msg = nullptr) {
+#if AMREX_DEVICE_COMPILE
+#if defined(NDEBUG)
+        amrex::ignore_unused(EX,file,line,msg);
+#else
+        if (msg) {
+            AMREX_DEVICE_PRINTF("Assertion `%s' failed, file \"%s\", line %d, Msg: %s",
+                                EX, file, line, msg);
+        } else {
+            AMREX_DEVICE_PRINTF("Assertion `%s' failed, file \"%s\", line %d",
+                                EX, file, line);
+        }
+        AMREX_DEVICE_ASSERT(0);
+#endif
+#else
+        Assert_host(EX,file,line,msg);
+#endif
+    }
 
     /**
     * \brief This is used by amrex::Error(), amrex::Abort(), and amrex::Assert()
@@ -145,19 +212,37 @@ namespace amrex
     */
     std::string get_command_argument (int number);
 
+#ifndef _MSC_VER
     inline void GccPlacater ()
     {
         std::allocator<bool> a_b;
         std::allocator<char> a_c;
         std::allocator<int> a_i;
         std::allocator<long> a_l;
+        std::allocator<long long> a_ll;
         std::allocator<unsigned char> a_uc;
         std::allocator<unsigned int> a_ui;
         std::allocator<unsigned long> a_ul;
+        std::allocator<unsigned long long> a_ull;
         std::allocator<float> a_f;
         std::allocator<double> a_d;
         std::allocator<std::string> a_s;
+
+        amrex::ignore_unused(a_b);
+        amrex::ignore_unused(a_c);
+        amrex::ignore_unused(a_i);
+        amrex::ignore_unused(a_l);
+        amrex::ignore_unused(a_ll);
+        amrex::ignore_unused(a_uc);
+        amrex::ignore_unused(a_ui);
+        amrex::ignore_unused(a_ul);
+        amrex::ignore_unused(a_ull);
+        amrex::ignore_unused(a_ll);
+        amrex::ignore_unused(a_f);
+        amrex::ignore_unused(a_d);
+        amrex::ignore_unused(a_s);
     }
+#endif
 
     class Geometry;
 
@@ -186,7 +271,7 @@ namespace amrex
 
     private:
 
-        static std::vector<std::unique_ptr<AMReX> > m_instance;
+        static AMREX_EXPORT std::vector<std::unique_ptr<AMReX> > m_instance;
 
         Geometry* m_geom = nullptr;
     };

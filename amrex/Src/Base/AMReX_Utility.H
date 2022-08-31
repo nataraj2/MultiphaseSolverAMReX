@@ -1,27 +1,30 @@
 #ifndef BL_UTILITY_H
 #define BL_UTILITY_H
-
-#include <cstdlib>
-#include <iostream>
-#include <string>
-#include <map>
-#include <chrono>
-#include <type_traits>
-
-#include <sys/types.h>
-#include <unistd.h>
-#include <sys/wait.h>
+#include <AMReX_Config.H>
 
 #include <AMReX_BLassert.H>
 #include <AMReX_REAL.H>
+#include <AMReX_INT.H>
 #include <AMReX_Array.H>
 #include <AMReX_Vector.H>
 #include <AMReX_Box.H>
 #include <AMReX_BoxArray.H>
 #include <AMReX_DistributionMapping.H>
 #include <AMReX_ParallelDescriptor.H>
+#include <AMReX_Random.H>
+#include <AMReX_GpuQualifiers.H>
+#include <AMReX_FileSystem.H>
 
-
+#include <cfloat>
+#include <chrono>
+#include <climits>
+#include <cstdlib>
+#include <iostream>
+#include <limits>
+#include <map>
+#include <sstream>
+#include <string>
+#include <type_traits>
 
 namespace amrex
 {
@@ -29,18 +32,22 @@ namespace amrex
 * \brief Useful C++ Utility Functions
 */
 
-    //! This shuts up the compiler about unused variables
-    template<class T> void ignore_unused( const T& ) { }
-
     //! Return true if argument is a non-zero length string of digits.
     bool is_integer (const char* str);
+
+    //! Return true and store value in v if string s is type T.
+    template <typename T> bool is_it (std::string const& s, T& v);
+
     //! Splits "instr" into separate pieces based on "separators".
     const std::vector<std::string>& Tokenize (const std::string& instr,
                                               const std::string& separators);
 
-    //! Converts all characters of the string into lower or uppercase based on std::locale 
+    //! Converts all characters of the string into lower or uppercase based on std::locale
     std::string toLower (std::string s);
     std::string toUpper (std::string s);
+
+    //! Trim leading and trailing white space
+    std::string trim (std::string s, std::string const& space = " \t");
 
     //! Returns rootNNNN where NNNN == num.
     std::string Concatenate (const std::string& root,
@@ -55,15 +62,15 @@ namespace amrex
     *  if path is NULL or "/".  mode is the mode passed to mkdir() for
     *  any directories that must be created (for example:  0755).
     *  verbose will print out the directory creation steps.
-    * 
+    *
     *  For example, if it is passed the string "/a/b/c/d/e/f/g", it
     *  will return successfully when all the directories in the pathname
     *  exist; i.e. when the full pathname is a valid directory.
     *
     *  In a Windows environment, the path separator is a '\', so that if using
-    *  the example given above you must pass the string  
+    *  the example given above you must pass the string
     *  "\\a\\b\\c\\d\\e\\f\\g"  (Note that you must escape the backslash in a
-    *  character string), 
+    *  character string),
     *
     *  Only the last mkdir return value is checked for success as errno may not
     *  be set to EEXIST if a directory exists but mkdir has other reasons
@@ -72,13 +79,11 @@ namespace amrex
     */
     bool UtilCreateDirectory (const std::string& path,
                               mode_t             mode,
-			      bool               verbose = false);
+                              bool               verbose = false);
     //! Output a message and abort when couldn't create the directory.
     void CreateDirectoryFailed (const std::string& dir);
     //! Output a message and abort when couldn't open the file.
     void FileOpenFailed (const std::string& dir);
-    //! Attempt to unlink the file.  Ignore any errors.
-    void UnlinkFile (const std::string& file);
     /**
     * \brief Check if a file already exists.
     *   Return true if the filename is an existing file, directory,
@@ -160,7 +165,7 @@ namespace amrex
     *  "p" MUST be in the open interval (0,1).
     *
     *  Entry points for Fortran:
-    * 
+    *
     *    REAL_T val
     *    call blinvnormdistbest(val)
     *
@@ -171,133 +176,47 @@ namespace amrex
     */
     double InvNormDistBest (double p);
 
-    /**
-    * \brief Generate a psuedo-random double using C++11's mt19937.
-    *
-    *  Generates one pseudorandom real number (double) from a normal
-    *  distribution with mean 'mean' and standard deviation 'stddev'.
-    *
-    */
-    AMREX_GPU_HOST_DEVICE double RandomNormal (double mean, double stddev);
-
-    /**
-    * \brief Generate a psuedo-random double using C++11's mt19937.
-    *
-    *  Generates one pseudorandom real number (double) which is
-    *  uniformly distributed on [0,1)-interval for each call.
-    *
-    */
-    AMREX_GPU_HOST_DEVICE double Random (); // [0,1)
-
-    /**
-    * \brief Generate a psuedo-random int using C++11's mt19937.
-    *
-    *  Generates one pseudorandom unsigned long integer which is
-    *  uniformly distributed on [0,n-1]-interval for each call.
-    *
-    */
-    unsigned long Random_int(unsigned long n); // [0,n-1]
-
-    /** \brief Set the seed of the random number generator.
-    *
-    *  There is also an entry point for Fortran callable as:
-    *
-    *  INTEGER seed
-    *  call blutilinitrand(seed)
-    *
-    *  or
-    *
-    *  INTEGER seed
-    *  call blinitrand(seed)
-    */
-    void InitRandom (unsigned long seed, int nprocs=ParallelDescriptor::NProcs());
-
-    void ResetRandomSeed(unsigned long seed);
-    /**
-    * \brief Save and restore random state.
-    *
-    */
-    void SaveRandomState(std::ostream& os);
-
-    void RestoreRandomState(std::istream& is, int nthreads_old, int nstep_old);
-
-    /**
-    * \brief Create a unique subset of random numbers from a pool
-    *   of integers in the range [0, poolSize - 1]
-    *   the set will be in the order they are found
-    *   setSize must be <= poolSize
-    *   uSet will be resized to setSize
-    *   if you want all processors to have the same set,
-    *   call this on one processor and broadcast the array
-    */
-    void UniqueRandomSubset (Vector<int> &uSet, int setSize, int poolSize,
-                             bool printSet = false);
-
-    /**
-    * \brief Fill binCounts with the number of items for each bin.
-    *   The remainder items are randomly assigned.
-    */
-    void NItemsPerBin (int totalItems, Vector<int> &binCounts);
-
     /* \brief cumulative refinement ratio between levels */
     int CRRBetweenLevels(int fromlevel, int tolevel,
                          const Vector<int> &refratios);
 
-    /**
-    * \brief Set the seeds of the random number generator for each CUDA thread .
-    *  An in-built CUDA library, curand_init is used here.
-    *  The pseusorandom sequence currently implemented is obtained 
-    *  from the XORWOW and MRG32k3a generator
-    */
-    void InitRandSeedOnDevice(int N); 
-   
-
-    /**
-    * \brief Resize seed array and copy address to global symbol 
-    */
-    void ResizeRandomSeed(int N);
-
-    void CheckSeedArraySizeAndResize (int N);
-
-    void DeallocateRandomSeedDevArray();
-
     class expect;
     std::istream& operator>>(std::istream&, const expect& exp);
-    
+
     class expect
     {
-	friend std::istream& operator>>(std::istream&, const expect& exp);
+        friend std::istream& operator>>(std::istream&, const expect& exp);
     public:
-	explicit expect(const std::string& str_);
-	explicit expect(const char* istr_);
-	explicit expect(char c);
-	const std::string& the_string() const;
+        explicit expect(const std::string& str_);
+        explicit expect(const char* istr_);
+        explicit expect(char c);
+        const std::string& the_string() const;
     private:
-	std::string istr;
+        std::string istr;
     };
 
     class StreamRetry
     {
       public:
         StreamRetry(std::ostream &os, const std::string &suffix,
-	            const int maxtries);
+                    const int maxtries);
         StreamRetry(const std::string &filename,
-	            const bool abortonretryfailure,
-	            const int maxtries);
-	bool TryOutput();
-	bool TryFileOutput();
+                    const bool abortonretryfailure,
+                    const int maxtries);
+        bool TryOutput();
+        bool TryFileOutput();
         static int NStreamErrors()       { return nStreamErrors; }
         static void ClearStreamErrors()  { nStreamErrors = 0;    }
 
       private:
         int tries, maxTries;
-	bool abortOnRetryFailure;
-	std::string fileName;
-	std::ostream &sros;
-	std::ostream::pos_type spos;
-	std::string suffix;
+        bool abortOnRetryFailure;
+        std::string fileName;
+        std::ostream &sros;
+        std::ostream::pos_type spos;
+        std::string suffix;
 
-	static int nStreamErrors;
+        static int nStreamErrors;
     };
 
     Vector<char> SerializeStringArray(const Vector<std::string> &stringArray);
@@ -310,9 +229,9 @@ namespace amrex
     //
     // For gcc, there are extra 32 bytes for each map node.
     // For others, this number may be different.
-    static const long gcc_map_node_extra_bytes = 32L;
-    template <typename T> long bytesOf (const std::vector<T>& v);
-    template <typename Key, typename T, class Compare> long bytesOf (const std::map<Key,T,Compare>& m);
+    static const Long gcc_map_node_extra_bytes = 32L;
+    template <typename T> Long bytesOf (const std::vector<T>& v);
+    template <typename Key, typename T, class Compare> Long bytesOf (const std::map<Key,T,Compare>& m);
 
     void BroadcastBool(bool &bBool, int myLocalId, int rootId, const MPI_Comm &localComm);
 
@@ -320,7 +239,8 @@ namespace amrex
     void BroadcastStringArray(Vector<std::string> &bSA, int myLocalId, int rootId, const MPI_Comm &localComm);
 
     template<class T> void BroadcastArray(Vector<T> &aT, int myLocalId, int rootId, const MPI_Comm &localComm);
-    void USleep(double sleepsec);
+
+    void Sleep (double sleepsec);  // Sleep for sleepsec seconds
 
 
     using MaxResSteadyClock = std::conditional<std::chrono::high_resolution_clock::is_steady,
@@ -331,6 +251,19 @@ namespace amrex
     template<typename T> void hash_combine (uint64_t & seed, const T & val) noexcept;
     template<typename T> uint64_t hash_vector (const Vector<T> & vec, uint64_t seed = 0xDEADBEEFDEADBEEF) noexcept;
 
+}
+
+template <typename T>
+bool amrex::is_it (std::string const& s, T& v)
+{
+    std::istringstream ss(s);
+    if (ss >> v) {
+        std::string left;
+        std::getline(ss, left);
+        return left.empty();
+    } else {
+        return false;
+    }
 }
 
 template<class T> void amrex::BroadcastArray(Vector<T> &aT, int myLocalId, int rootId, const MPI_Comm &localComm)
@@ -395,7 +328,7 @@ template<class T> void amrex::BroadcastArray(Vector<T> &aT, int myLocalId, int r
 /*
   The macro BL_FORT_USE_LOWERCASE indicates that C++ code should call
   Fortran routines using lowercase letters for all the letters in the
-  routine.  This is set automatically by the make subsystem.  
+  routine.  This is set automatically by the make subsystem.
 
   For example, if the Fortran routine is named abcxyx, then it will
   be called in C++ code as abcxyx.
@@ -414,15 +347,15 @@ template<class T> void amrex::BroadcastArray(Vector<T> &aT, int myLocalId, int r
 */
 #define BL_IGNORE_MAX 100000
 
-template <typename T> 
-long 
+template <typename T>
+amrex::Long
 amrex::bytesOf (const std::vector<T>& v)
 {
     return sizeof(v) + v.capacity()*sizeof(T);
 }
 
 template <typename Key, typename T, class Compare>
-long
+amrex::Long
 amrex::bytesOf (const std::map<Key,T,Compare>& m)
 {
     return sizeof(m) + m.size()*(sizeof(Key)+sizeof(T)+gcc_map_node_extra_bytes);

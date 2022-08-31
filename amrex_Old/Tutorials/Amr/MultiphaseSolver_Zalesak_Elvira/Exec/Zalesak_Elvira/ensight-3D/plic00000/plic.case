@@ -1,0 +1,10 @@
+FORMAT                                                                          
+type: ensight gold                                                              
+GEOMETRY                                                                        
+model: 1 plic.******                                                            
+TIME                                                                            
+time set: 1                                                                     
+number of steps:            1
+filename start number:            0                                             
+filename increment: 1                                                           
+time values:  0.00000E+00

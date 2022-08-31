@@ -1,15 +1,22 @@
 #ifndef AMREX_NEIGHBORPARTICLES_H_
 #define AMREX_NEIGHBORPARTICLES_H_
+#include <AMReX_Config.H>
 
 #include <AMReX_MultiFab.H>
 #include <AMReX_MultiFabUtil.H>
 #include <AMReX_Particles.H>
-
-#ifdef AMREX_USE_CUDA
+#include <AMReX_ParticleUtil.H>
 #include <AMReX_NeighborList.H>
-#endif
+#include <AMReX_OpenMP.H>
+#include <AMReX_ParticleTile.H>
 
 namespace amrex {
+
+  struct NeighborCode
+  {
+      int grid_id;
+      IntVect periodic_shift;
+  };
 
 ///
 /// This is a container for particles that undergo short-range interations.
@@ -22,12 +29,16 @@ namespace amrex {
 /// in AMR subcycling to keep track of coarse level particles that may move on to fine
 /// levels during a fine level time step.
 ///
-template <int NStructReal, int NStructInt>
+template <int NStructReal, int NStructInt, int NArrayReal=0, int NArrayInt=0>
 class NeighborParticleContainer
-    : public ParticleContainer<NStructReal, NStructInt, 0, 0>
+    : public ParticleContainer<NStructReal, NStructInt, NArrayReal, NArrayInt>
 {
-    using ParticleContainerType = ParticleContainer<NStructReal, NStructInt, 0, 0>;
-    
+public:
+    using ParticleContainerType = ParticleContainer<NStructReal, NStructInt, NArrayReal, NArrayInt>;
+    using ParticleType = typename ParticleContainerType::ParticleType;
+    using SuperParticleType = typename ParticleContainerType::SuperParticleType;
+    using NeighborListContainerType = Vector<std::map<std::pair<int, int>, amrex::NeighborList<ParticleType> > >;
+private:
     struct MaskComps
     {
         enum {
@@ -98,11 +109,11 @@ class NeighborParticleContainer
         }
 
         bool operator== (const NeighborCopyTag& other) const {
-            return (level == other.level) and (grid == other.grid) and (tile == other.tile)
+            return (level == other.level) && (grid == other.grid) && (tile == other.tile)
                 AMREX_D_TERM(
-                    and (periodic_shift[0] == other.periodic_shift[0]),
-                    and (periodic_shift[1] == other.periodic_shift[1]),
-                    and (periodic_shift[2] == other.periodic_shift[2])
+                    && (periodic_shift[0] == other.periodic_shift[0]),
+                    && (periodic_shift[1] == other.periodic_shift[1]),
+                    && (periodic_shift[2] == other.periodic_shift[2])
                     );
         }
 
@@ -135,13 +146,13 @@ class NeighborParticleContainer
             amrex::Error("operator<<(ostream&, const InverseCopyTag&) failed");
         return os;
     }
-    
+
     struct NeighborCommTag {
 
         NeighborCommTag (int pid, int lid, int gid, int tid)
             : proc_id(pid), level_id(lid), grid_id(gid), tile_id(tid)
             {}
-        
+
         int proc_id;
         int level_id;
         int grid_id;
@@ -161,9 +172,9 @@ class NeighborParticleContainer
         }
 
         bool operator== (const NeighborCommTag& other) const {
-            return ( (proc_id == other.proc_id) and
-                     (grid_id == other.grid_id) and
-                     (tile_id == other.tile_id) and
+            return ( (proc_id == other.proc_id) &&
+                     (grid_id == other.grid_id) &&
+                     (tile_id == other.tile_id) &&
                      (level_id == other.level_id));
         }
 
@@ -178,15 +189,14 @@ class NeighborParticleContainer
 
 public:
 
-    using ParticleType = typename ParticleContainer<NStructReal,
-                                                    NStructInt, 0, 0>::ParticleType;
-    using MyParIter = ParIter<NStructReal, NStructInt, 0, 0>;
+    using MyParIter = ParIter<NStructReal, NStructInt, NArrayReal, NArrayInt>;
     using PairIndex = std::pair<int, int>;
     using NeighborCommMap = std::map<NeighborCommTag, Vector<char> >;
-    using AoS = typename ParticleContainer<NStructReal, NStructInt, 0, 0>::AoS;
-    using ParticleVector = typename ParticleContainer<NStructReal, NStructInt, 0, 0>::ParticleVector;
-    using IntVector  = typename ParticleContainer<NStructReal, NStructInt, 0, 0>::IntVector;
-    using SendBuffer = typename ParticleContainer<NStructReal, NStructInt, 0, 0>::SendBuffer;
+    using AoS = typename ParticleContainer<NStructReal, NStructInt, NArrayReal, NArrayInt>::AoS;
+    using ParticleVector = typename ParticleContainer<NStructReal, NStructInt, NArrayReal, NArrayInt>::ParticleVector;
+    using ParticleTile = typename ParticleContainer<NStructReal, NStructInt, NArrayReal, NArrayInt>::ParticleTileType;
+    using IntVector  = typename ParticleContainer<NStructReal, NStructInt, NArrayReal, NArrayInt>::IntVector;
+    using SendBuffer = typename ParticleContainer<NStructReal, NStructInt, NArrayReal, NArrayInt>::SendBuffer;
 
     NeighborParticleContainer (ParGDBBase* gdb, int ncells);
 
@@ -200,6 +210,12 @@ public:
                                const Vector<BoxArray>            & ba,
                                const Vector<int>                 & rr,
                                int                               nneighbor);
+
+    NeighborParticleContainer ( const NeighborParticleContainer &) = delete;
+    NeighborParticleContainer& operator= ( const NeighborParticleContainer & ) = delete;
+
+    NeighborParticleContainer ( NeighborParticleContainer && ) = default;
+    NeighborParticleContainer& operator= ( NeighborParticleContainer && ) = default;
 
     ///
     /// Regrid functions
@@ -219,11 +235,11 @@ public:
     ///
     void sumNeighbors (int real_start_comp, int real_num_comp,
                        int int_start_comp, int int_num_comp);
-    
+
     ///
     /// This updates the neighbors with their current particle data.
     ///
-    void updateNeighbors ();
+    void updateNeighbors (bool boundary_neighbors_only=false);
 
     ///
     /// Each tile clears its neighbors, freeing the memory
@@ -234,31 +250,59 @@ public:
     /// Build a Neighbor List for each tile
     ///
     template <class CheckPair>
-    void buildNeighborList (CheckPair check_pair, bool sort=false);
+    void buildNeighborList (CheckPair&& check_pair, bool sort=false);
+
+    ///
+    /// Build a Neighbor List for each tile
+    ///
+    template <class CheckPair, class OtherPCType>
+    void buildNeighborList (CheckPair&& check_pair, OtherPCType& other,
+                            Vector<std::map<std::pair<int, int>, amrex::NeighborList<typename OtherPCType::ParticleType> > >& neighbor_lists,
+                            bool sort=false);
+
+    template <class CheckPair>
+    void selectActualNeighbors (CheckPair&& check_pair, int num_cells=1);
 
     void printNeighborList ();
 
     void setRealCommComp (int i, bool value);
     void setIntCommComp (int i, bool value);
 
-    ParticleVector& GetNeighbors (int lev, int grid, int tile)
+    ParticleTile& GetNeighbors (int lev, int grid, int tile)
     {
         return neighbors[lev][std::make_pair(grid,tile)];
     }
 
-    const ParticleVector& GetNeighbors (int lev, int grid, int tile) const
+    const ParticleTile& GetNeighbors (int lev, int grid, int tile) const
     {
         return neighbors[lev][std::make_pair(grid,tile)];
     }
 
-    IntVector& GetNeighborList (int lev, int grid, int tile)
+    template <typename T,
+              typename std::enable_if<std::is_same<T,bool>::value,int>::type=0>
+    void AddRealComp (T communicate=true)
     {
-        return neighbor_list[lev][std::make_pair(grid,tile)];
+        ParticleContainer<NStructReal, NStructInt, NArrayReal, NArrayInt>::
+            AddRealComp(communicate);
+        ghost_real_comp.push_back(communicate);
+        calcCommSize();
     }
 
-    const IntVector& GetNeighborList (int lev, int grid, int tile) const
+    template <typename T,
+              typename std::enable_if<std::is_same<T,bool>::value,int>::type=0>
+    void AddIntComp (T communicate=true)
     {
-        return neighbor_list[lev][std::make_pair(grid,tile)];
+        ParticleContainer<NStructReal, NStructInt, NArrayReal, NArrayInt>::
+            AddIntComp(communicate);
+        ghost_int_comp.push_back(communicate);
+        calcCommSize();
+    }
+
+    void Redistribute (int lev_min=0, int lev_max=-1, int nGrow=0, int local=0)
+    {
+        clearNeighbors();
+        ParticleContainer<NStructReal, NStructInt, NArrayReal, NArrayInt>
+            ::Redistribute(lev_min, lev_max, nGrow, local);
     }
 
     void RedistributeLocal ()
@@ -268,46 +312,33 @@ public:
         const int nGrow = 0;
         const int local = 1;
         clearNeighbors();
-        this->Redistribute(lev_min, lev_max, nGrow, local);    
+        this->Redistribute(lev_min, lev_max, nGrow, local);
     }
 
-#ifdef AMREX_USE_CUDA
-
-    template <class CheckPair>
-    void buildNeighborListGPU (CheckPair check_pair);
-    
-    void printNeighborListGPU ();
-    
-    void sortParticlesByNeighborDestGPU ();
-    
+#ifdef AMREX_USE_GPU
     void fillNeighborsGPU ();
-    
-    void updateNeighborsGPU ();
-    
+    void updateNeighborsGPU (bool boundary_neighbors_only=false);
     void clearNeighborsGPU ();
-    
-#else 
-
-    template <class CheckPair>
-    void buildNeighborListCPU (CheckPair check_pair, bool sort);
-    
-    void printNeighborListCPU (const std::string& prefix);
-    
+#else
     void fillNeighborsCPU ();
-
     void sumNeighborsCPU (int real_start_comp, int real_num_comp,
                           int int_start_comp, int int_num_comp);
-    
     void updateNeighborsCPU (bool reuse_rcv_counts=true);
-    
-    void clearNeighborsCPU ();    
-
+    void clearNeighborsCPU ();
 #endif
 
-    void setEnableInverse (bool flag) { enable_inverse = flag; }
+    void setEnableInverse (bool flag)
+    {
+        enable_inverse = flag;
+        calcCommSize();
+    }
 
     bool enableInverse () { return enable_inverse; }
-    
+
+    void buildNeighborMask ();
+
+    void buildNeighborCopyOp (bool use_boundary_neighbor=false);
+
 protected:
 
     void cacheNeighborInfo ();
@@ -316,6 +347,11 @@ protected:
     /// This builds the internal mask data structure used for looking up neighbors
     ///
     void BuildMasks ();
+
+    ///
+    /// Are the masks computed by the above function still valid?
+    ///
+    bool areMasksValid ();
 
     void GetNeighborCommTags ();
 
@@ -328,14 +364,14 @@ protected:
     void calcCommSize ();
 
     ///
-    /// Perform the MPI communication neccesary to fill neighbor buffers
+    /// Perform the MPI communication necessary to fill neighbor buffers
     ///
     void fillNeighborsMPI (bool reuse_rcv_counts);
 
     void sumNeighborsMPI (std::map<int, Vector<char> >& not_ours,
                           int real_start_comp, int real_num_comp,
                           int int_start_comp, int int_num_comp);
-    
+
     ///
     /// Perform handshake to figure out how many bytes each proc should receive
     ///
@@ -353,43 +389,35 @@ protected:
 
     IntVect computeRefFac (const int src_lev, const int lev);
 
-    amrex::Vector<std::map<PairIndex, amrex::Vector<InverseCopyTag> > > inverse_tags;
-    amrex::Vector<std::map<PairIndex, ParticleVector> > neighbors;
-    amrex::Vector<std::map<PairIndex, IntVector> >      neighbor_list;
+    Vector<std::map<PairIndex, Vector<InverseCopyTag> > > inverse_tags;
+    Vector<std::map<PairIndex, ParticleTile> > neighbors;
+    Vector<std::map<PairIndex, IntVector> >      neighbor_list;
     const size_t pdata_size = sizeof(ParticleType);
 
     static constexpr int num_mask_comps = 3;  //!< grid, tile, level
     size_t cdata_size;
     int m_num_neighbor_cells;
-    amrex::Vector<NeighborCommTag> local_neighbors;
-    amrex::Vector<std::unique_ptr<iMultiFab> > mask_ptr;
+    Vector<NeighborCommTag> local_neighbors;
+    Vector<std::unique_ptr<iMultiFab> > mask_ptr;
 
-    amrex::Vector<std::map<PairIndex, Vector<Vector<NeighborCopyTag> > > > buffer_tag_cache;
-    amrex::Vector<std::map<PairIndex, int> > local_neighbor_sizes;
+    Vector<std::map<PairIndex, Vector<Vector<NeighborCopyTag> > > > buffer_tag_cache;
+    Vector<std::map<PairIndex, int> > local_neighbor_sizes;
 
     //! each proc knows how many sends it will do, and how many bytes it will rcv
     //! from each other proc.
-    amrex::Vector<int> neighbor_procs;
-    amrex::Vector<long> rcvs;
-    long num_snds;
+    Vector<int> neighbor_procs;
+    Vector<Long> rcvs;
+    Long num_snds;
     std::map<int, Vector<char> > send_data;
 
-    std::array<bool, AMREX_SPACEDIM + NStructReal> rc;
-    std::array<bool, 2 + NStructInt>  ic;
+    Vector<int> ghost_real_comp;
+    Vector<int> ghost_int_comp;
 
     static bool use_mask;
 
     static bool enable_inverse;
 
-#ifdef AMREX_USE_CUDA
-    void fillNeighborsMPIGPU (std::map<int, SendBuffer>& not_ours);
-    
-    void buildNeighborMask ();
-
-    struct NeighborCode {
-        int grid_id;
-        IntVect periodic_shift;
-    };
+#ifdef AMREX_USE_GPU
 
     struct NeighborTask {
         int grid_id;
@@ -413,26 +441,46 @@ protected:
             return false;
         }
     };
-        
+
     // These are used to keep track of which particles need to be ghosted to which grids
     bool m_neighbor_mask_initialized = false;
     std::unique_ptr<amrex::iMultiFab> m_neighbor_mask_ptr;
+    // {pboxid: [[neighbor codes] size= #intersected nbrs] size= #boundary boxes}
     std::map<int, std::vector<std::vector<NeighborCode> > > m_grid_map;
-    std::map<int, amrex::Gpu::HostVector<int> > m_start;
-    std::map<int, amrex::Gpu::HostVector<int> > m_stop;
-    
-    std::map<std::pair<int, int>, amrex::NeighborList<ParticleType> > m_neighbor_list;
+
+    // {pboxid: [ith intersected pbox: nbr codes]}
+    std::map<int, amrex::Gpu::DeviceVector<NeighborCode> > m_code_array;
+    // {pboxid: [ith intersected pbox: intersection]}
+    std::map<int, amrex::Gpu::DeviceVector<Box> >          m_isec_boxes;
+    std::map<int, amrex::Gpu::DeviceVector<int> > m_code_offsets; // to be removed
+
+    ParticleCopyOp neighbor_copy_op;
+    ParticleCopyPlan neighbor_copy_plan;
+
+    amrex::PODVector<char, PolymorphicArenaAllocator<char> > snd_buffer;
+    amrex::Gpu::DeviceVector<char> rcv_buffer;
+
+    Gpu::PinnedVector<char> pinned_snd_buffer;
+    Gpu::PinnedVector<char> pinned_rcv_buffer;
 #endif
+
+    NeighborListContainerType m_neighbor_list;
+
+    Vector<std::map<std::pair<int, int>, amrex::Gpu::DeviceVector<int> > > m_boundary_particle_ids;
+
+    bool hasNeighbors() const { return m_has_neighbors; }
+
+    bool m_has_neighbors = false;
 };
-    
+
 #include "AMReX_NeighborParticlesI.H"
-    
-#ifdef AMREX_USE_CUDA
+
+#ifdef AMREX_USE_GPU
 #include "AMReX_NeighborParticlesGPUImpl.H"
 #else
 #include "AMReX_NeighborParticlesCPUImpl.H"
 #endif
-    
+
 }
 
 #endif // _NEIGHBORPARTICLES_H_

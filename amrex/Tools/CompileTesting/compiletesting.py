@@ -1,6 +1,5 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
-from __future__ import print_function
 import sys
 import os
 import shlex
@@ -46,22 +45,15 @@ def compiletesting(arg_string):
 #                     'Tutorials/Particles/ElectromagneticPIC',
 #                     'Tutorials/Particles/ElectrostaticPIC',
                      'Tutorials/Particles/NeighborList',
-                     'OldTutorials/DataServicesTest0',
-#                     'OldTutorials/MultiColor_C',
-                     'OldTutorials/MultiFabTests_C',
-                     'OldTutorials/MultiGrid_C',
-                     'OldTutorials/Tiling_C',
-                     'OldTutorials/Tiling_Heat_C',
-                     'OldTutorials/WaveEquation_C',
+                     'Tests/DataServicesTest0',
                      'Tests/BBIOBenchmark',
                      'Tests/C_BaseLib',
                      'Tests/IOBenchmark',
                      'Tests/NoFort',
+                     'Tests/SinglePrecision',
+                     'Tests/Particles/ParticleMesh',
                      'Tests/LinearSolvers/CellEB',
                      'Tests/LinearSolvers/CellEB2',
-                     'Tests/LinearSolvers/C_CellMG',
-                     'Tests/LinearSolvers/ComparisonTest',
-                     'Tests/LinearSolvers/C_TensorMG',
                      'Tests/MKDir']
 
     else:
@@ -72,8 +64,8 @@ def compiletesting(arg_string):
                      'Tutorials/LinearSolvers/ABecLaplacian_F',
                      'Tutorials/Particles/NeighborList',
                      'Tests/NoFort',
-                     'Tests/LinearSolvers/CellEB2',
-                     'Tests/LinearSolvers/ComparisonTest']
+                     'Tests/SinglePrecision',
+                     'Tests/LinearSolvers/CellEB2']
 
     print("Test List: ", test_list)
 
@@ -85,16 +77,16 @@ def compiletesting(arg_string):
     for test in test_list:
         print("Compile", test)
         os.chdir(os.path.join(TOP,test))
-        
+
         command = "make realclean"
         outfile = "makerealclean.ou"
         run(command, outfile)
-        
+
         command = "make -j4 " + args.make_flags
         if args.typecheck:
             command += " typecheck"
         outfile = "make.ou"
-        run(command, outfile)        
+        run(command, outfile)
 
         test_success = False
         if args.typecheck:
@@ -155,4 +147,3 @@ def run(command, outfile=None):
 
 if __name__ == "__main__":
     compiletesting(sys.argv[1:])
-

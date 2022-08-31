@@ -2,7 +2,7 @@
 #include <AMReX_YAFluxRegister.H>
 #include <AMReX_YAFluxRegister_K.H>
 
-#ifdef _OPENMP
+#ifdef AMREX_USE_OMP
 #include <omp.h>
 #endif
 
@@ -37,7 +37,6 @@ YAFluxRegister::define (const BoxArray& fba, const BoxArray& cba,
 
     BoxArray cfba = fba;
     cfba.coarsen(ref_ratio);
-    cfba.uniqify();
 
     Box cdomain = m_crse_geom.Domain();
     for (int idim=0; idim < AMREX_SPACEDIM; ++idim) {
@@ -49,44 +48,18 @@ YAFluxRegister::define (const BoxArray& fba, const BoxArray& cba,
     m_crse_fab_flag.resize(m_crse_flag.local_size(), crse_cell);
 
     m_crse_flag.setVal(crse_cell);
-
-    // TODO gpu
-
-#ifdef _OPENMP
-#pragma omp parallel
-#endif
     {
-        std::vector< std::pair<int,Box> > isects;
-
-        for (MFIter mfi(m_crse_flag); mfi.isValid(); ++mfi)
-        {
-            auto& fab = m_crse_flag[mfi];
-            const Box& bx = fab.box() & cdomain;
-
-            bool has_fine = false;
-
-            for (const auto& iv : pshifts)
-            {
-                cfba.intersections(bx+iv, isects, false, 1);
-                for (const auto& is : isects)
-                {
-                    const Box& ibx = is.second - iv;
-                    fab.setVal(crse_fine_boundary_cell, ibx, 0, 1);
-                    has_fine = true;
-                }
-            }
-
-            for (const auto& iv : pshifts)
-            {
-                cfba.intersections(bx+iv, isects);
-                for (const auto& is : isects)
-                {
-                    const Box& ibx = is.second - iv;
-                    fab.setVal(fine_cell, ibx, 0, 1);
-                }
-            }
-
-            if (has_fine) {
+        iMultiFab foo(cfba, fdm, 1, 1, MFInfo().SetAlloc(false));
+        const FabArrayBase::CPC& cpc1 = m_crse_flag.getCPC(IntVect(1), foo, IntVect(1), cperiod);
+        m_crse_flag.setVal(crse_fine_boundary_cell, cpc1, 0, 1);
+        const FabArrayBase::CPC& cpc0 = m_crse_flag.getCPC(IntVect(1), foo, IntVect(0), cperiod);
+        m_crse_flag.setVal(fine_cell, cpc0, 0, 1);
+        auto recv_layout_mask = m_crse_flag.RecvLayoutMask(cpc0);
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (Gpu::notInLaunchRegion())
+#endif
+        for (MFIter mfi(m_crse_flag); mfi.isValid(); ++mfi) {
+            if (recv_layout_mask[mfi]) {
                 m_crse_fab_flag[mfi.LocalIndex()] = fine_cell;
             }
         }
@@ -97,9 +70,10 @@ YAFluxRegister::define (const BoxArray& fba, const BoxArray& cba,
     int nlocal = 0;
     const int myproc = ParallelDescriptor::MyProc();
     const int n_cfba = cfba.size();
+    cfba.uniqify();
 
-#ifdef _OPENMP
-    
+#ifdef AMREX_USE_OMP
+
     const int nthreads = omp_get_max_threads();
     Vector<BoxList> bl_priv(nthreads, BoxList());
     Vector<Vector<int> > procmap_priv(nthreads);
@@ -196,20 +170,25 @@ YAFluxRegister::define (const BoxArray& fba, const BoxArray& cba,
         m_cfp_mask.define(cfp_ba, cfp_dm, 1, 0, MFInfo(), FArrayBoxFactory());
         m_cfp_mask.setVal(1.0);
 
+        Vector<Array4BoxTag<Real> > tags;
+
+        bool run_on_gpu = Gpu::inLaunchRegion();
+
         const Box& domainbox = m_crse_geom.Domain();
 
-#ifdef _OPENMP
-#pragma omp parallel
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (!run_on_gpu)
 #endif
         {
             std::vector< std::pair<int,Box> > isects;
 
             for (MFIter mfi(m_cfp_mask); mfi.isValid(); ++mfi)
             {
-                auto& fab = m_cfp_mask[mfi];
-                const Box& bx = fab.box();
+                const Box& bx = mfi.fabbox();
                 if (!domainbox.contains(bx))  // part of the box is outside periodic boundary
                 {
+                    FArrayBox& fab = m_cfp_mask[mfi];
+                    auto const& arr = m_cfp_mask.array(mfi);
                     for (const auto& iv : pshifts)
                     {
                         if (iv != IntVect::TheZeroVector())
@@ -218,13 +197,25 @@ YAFluxRegister::define (const BoxArray& fba, const BoxArray& cba,
                             for (const auto& is : isects)
                             {
                                 const Box& ibx = is.second - iv;
-                                fab.setVal(0.0, ibx, 0, 1);
+                                if (run_on_gpu) {
+                                    tags.push_back({arr,ibx});
+                                } else {
+                                    fab.setVal<RunOn::Host>(0.0, ibx);
+                                }
                             }
                         }
                     }
                 }
             }
         }
+
+#ifdef AMREX_USE_GPU
+        amrex::ParallelFor(tags, 1,
+        [=] AMREX_GPU_DEVICE (int i, int j, int k, int n, Array4BoxTag<Real> const& tag) noexcept
+        {
+            tag.dfab(i,j,k,n) = 0.0;
+        });
+#endif
     }
 }
 
@@ -260,25 +251,15 @@ YAFluxRegister::CrseAdd (const MFIter& mfi,
     auto fab = m_crse_data.array(mfi);
     auto const flag = m_crse_flag.array(mfi);
 
-    if (runon == RunOn::Gpu && Gpu::inLaunchRegion())
+    AMREX_D_TERM(Array4<Real const> fxarr = fx->const_array();,
+                 Array4<Real const> fyarr = fy->const_array();,
+                 Array4<Real const> fzarr = fz->const_array(););
+
+    AMREX_LAUNCH_HOST_DEVICE_LAMBDA_FLAG ( runon, bx, tbx,
     {
-        AMREX_D_TERM(Array4<Real const> fxarr = fx->array();,
-                     Array4<Real const> fyarr = fy->array();,
-                     Array4<Real const> fzarr = fz->array(););
-        AMREX_LAUNCH_HOST_DEVICE_LAMBDA ( bx, tbx,
-        {
-            yafluxreg_crseadd(tbx, fab, flag, AMREX_D_DECL(fxarr,fyarr,fzarr),
-                              AMREX_D_DECL(dtdx,dtdy,dtdz),nc);
-        });
-    }
-    else
-    {
-        yafluxreg_crseadd(bx, fab, flag,
-                          AMREX_D_DECL(fx->array(),
-                                       fy->array(),
-                                       fz->array()),
+        yafluxreg_crseadd(tbx, fab, flag, AMREX_D_DECL(fxarr,fyarr,fzarr),
                           AMREX_D_DECL(dtdx,dtdy,dtdz),nc);
-    }
+    });
 }
 
 
@@ -299,25 +280,26 @@ YAFluxRegister::FineAdd (const MFIter& mfi,
     const int nc = m_cfpatch.nComp();
 
     const Real ratio = static_cast<Real>(AMREX_D_TERM(m_ratio[0],*m_ratio[1],*m_ratio[2]));
-    std::array<Real,AMREX_SPACEDIM> dtdx{AMREX_D_DECL(dt/(dx[0]*ratio),
-                                                      dt/(dx[1]*ratio),
-                                                      dt/(dx[2]*ratio))};
+    std::array<Real,AMREX_SPACEDIM> dtdx{{AMREX_D_DECL(dt/(dx[0]*ratio),
+                                                       dt/(dx[1]*ratio),
+                                                       dt/(dx[2]*ratio))}};
     const Dim3 rr = m_ratio.dim3();
 
-    std::array<FArrayBox const*,AMREX_SPACEDIM> flux{AMREX_D_DECL(a_flux[0],a_flux[1],a_flux[2])};
+    std::array<FArrayBox const*,AMREX_SPACEDIM> flux{{AMREX_D_DECL(a_flux[0],a_flux[1],a_flux[2])}};
     bool use_gpu = (runon == RunOn::Gpu) && Gpu::inLaunchRegion();
+    amrex::ignore_unused(use_gpu);
     std::array<FArrayBox,AMREX_SPACEDIM> ftmp;
     if (fbx != tbx) {
         AMREX_ASSERT(!use_gpu);
         for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
             const Box& b = amrex::surroundingNodes(fbx,idim);
             ftmp[idim].resize(b,nc);
-            ftmp[idim].setVal(0.0);
-            ftmp[idim].copy(*a_flux[idim]);
+            ftmp[idim].setVal<RunOn::Host>(0.0);
+            ftmp[idim].copy<RunOn::Host>(*a_flux[idim]);
             flux[idim] = &ftmp[idim];
         }
     }
-    
+
     AMREX_ASSERT(bx.cellCentered());
 
     for (int idim=0; idim < AMREX_SPACEDIM; ++idim)
@@ -335,15 +317,11 @@ YAFluxRegister::FineAdd (const MFIter& mfi,
                     auto d = cfp->array();
                     Real dtdxs = dtdx[idim];
                     int dirside = idim*2+side;
-                    if (use_gpu) {
-                        Array4<Real const> farr = f->array();
-                        AMREX_LAUNCH_DEVICE_LAMBDA ( lobx_is, tmpbox,
-                        {
-                            yafluxreg_fineadd(tmpbox, d, farr, dtdxs, nc, dirside, rr);
-                        });
-                    } else {
-                        yafluxreg_fineadd(lobx_is,  d, f->array(), dtdxs, nc, dirside, rr);
-                    }
+                    Array4<Real const> farr = f->const_array();
+                    AMREX_LAUNCH_HOST_DEVICE_LAMBDA_FLAG(runon, lobx_is, tmpbox,
+                    {
+                        yafluxreg_fineadd(tmpbox, d, farr, dtdxs, nc, dirside, rr);
+                    });
                 }
             }
             {
@@ -354,15 +332,11 @@ YAFluxRegister::FineAdd (const MFIter& mfi,
                     auto d = cfp->array();
                     Real dtdxs = dtdx[idim];
                     int dirside = idim*2+side;
-                    if (use_gpu) {
-                        Array4<Real const> farr = f->array();
-                        AMREX_LAUNCH_DEVICE_LAMBDA ( hibx_is, tmpbox,
-                        {
-                            yafluxreg_fineadd(tmpbox, d, farr, dtdxs, nc, dirside, rr);
-                        });
-                    } else {
-                        yafluxreg_fineadd(hibx_is, d, f->array(), dtdxs, nc, dirside, rr);
-                    }
+                    Array4<Real const> farr = f->const_array();
+                    AMREX_LAUNCH_HOST_DEVICE_LAMBDA_FLAG(runon, hibx_is, tmpbox,
+                    {
+                        yafluxreg_fineadd(tmpbox, d, farr, dtdxs, nc, dirside, rr);
+                    });
                 }
             }
         }
@@ -376,7 +350,7 @@ YAFluxRegister::Reflux (MultiFab& state, int dc)
     if (!m_cfp_mask.empty())
     {
         const int ncomp = m_ncomp;
-#ifdef _OPENMP
+#ifdef AMREX_USE_OMP
 #pragma omp parallel if (Gpu::notInLaunchRegion())
 #endif
         for (MFIter mfi(m_cfpatch); mfi.isValid(); ++mfi)
@@ -384,7 +358,7 @@ YAFluxRegister::Reflux (MultiFab& state, int dc)
             const Box& bx = m_cfpatch[mfi].box();
             auto const maskfab = m_cfp_mask.array(mfi);
             auto       cfptfab = m_cfpatch.array(mfi);
-            AMREX_HOST_DEVICE_FOR_4D ( bx, ncomp, i, j, k, n,
+            AMREX_HOST_DEVICE_PARALLEL_FOR_4D ( bx, ncomp, i, j, k, n,
             {
                 cfptfab(i,j,k,n) *= maskfab(i,j,k);
             });

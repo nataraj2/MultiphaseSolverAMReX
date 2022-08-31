@@ -8,7 +8,7 @@ using std::ios;
 
 #include <unistd.h>
 
-#include <WritePlotFile.H>
+#include <AMReX_WritePlotFile.H>
 #include <AMReX_REAL.H>
 #include <AMReX_Box.H>
 #include <AMReX_FArrayBox.H>
@@ -19,18 +19,14 @@ using std::ios;
 #include <AMReX_VisMF.H>
 #include <AMReX_AVGDOWN_F.H>
 #include "AMReX_ArrayLim.H"
-#include "DebugDump.H"
 #include <iomanip>
-
-#ifdef AMREX_DEBUG
-#include <TV_TempWrite.H>
-#endif
 
 #define GARBAGE 666.e+40
 
 using namespace amrex;
 using std::setw;
 using std::setprecision;
+using std::setfill;
 
 static
 void
@@ -55,15 +51,16 @@ PrintUsage (const char* progName)
   std::cout << "    fineFile= finest plot file  (input)" << '\n';
   std::cout << "    mediError = medium error file (optional output)" << '\n';
   std::cout << "    coarError = coarse error file (optional output)" << '\n';
-  std::cout << "   [-help]" << '\n';
-  std::cout << "   [-verbose]" << '\n';
+  std::cout << "   [help=1]" << '\n';
+  std::cout << "   [latex=1]" << '\n';
+  std::cout << "   [verbose=1]" << '\n';
   std::cout << '\n';
   exit(1);
 }
 /**********/
 bool
 amrDatasHaveSameDerives(const AmrData& amrd1,
-			const AmrData& amrd2)
+                        const AmrData& amrd2)
 {
   const Vector<std::string>& derives1 = amrd1.PlotVarNames();
   const Vector<std::string>& derives2 = amrd2.PlotVarNames();
@@ -139,7 +136,7 @@ getErrorNorms(Vector<Real>& a_norms, //one for each comp
               const string& a_coarFile,
               const string& a_errFile,
               const int& a_norm,
-              bool verbose)
+              bool verbose, bool print_header)
 {
   //
   // Scan the arguments.
@@ -197,10 +194,6 @@ getErrorNorms(Vector<Real>& a_norms, //one for each comp
   //
   Vector<MultiFab*> error(finestLevel+1);
 
-  if (ParallelDescriptor::IOProcessor())
-    std::cout << "Level  L"<< norm << " norm of Error in Each Component" << std::endl
-              << "-----------------------------------------------" << std::endl;
-
   Vector<Real> sum_norms(nComp);
   for (int iComp = 0; iComp < nComp; iComp++)
     sum_norms[iComp] = 0.0;
@@ -224,6 +217,9 @@ getErrorNorms(Vector<Real>& a_norms, //one for each comp
     IntVect refine_ratio   = getRefRatio(domain1, domain2);
     if (refine_ratio == IntVect())
       amrex::Error("Cannot find refinement ratio from data to exact");
+
+    if (print_header)
+      amrex::Print() << "level: " << iLevel << std::endl;
 
     if (verbose)
       std::cerr << "level = " << iLevel << "  Ref_Ratio = " << refine_ratio
@@ -320,12 +316,6 @@ getErrorNorms(Vector<Real>& a_norms, //one for each comp
     }
 
 
-    //
-    // Output Statistics
-    //
-    if (ParallelDescriptor::IOProcessor())
-      std::cout << "  " << iLevel << "    ";
-
 
 #ifdef BL_USE_MPI
     MPI_Datatype datatype = ParallelDescriptor::Mpi_typemap<Real>::type();
@@ -421,116 +411,148 @@ main (int   argc,
       char* argv[])
 {
   amrex::Initialize(argc,argv);
-
-  if (argc == 1)
-    PrintUsage(argv[0]);
-
-  ParmParse pp;
-
-  if (pp.contains("help"))
-    PrintUsage(argv[0]);
-
-  bool verbose = false;
-  if (pp.contains("verbose"))
-    verbose = true;
-
-  FArrayBox::setFormat(FABio::FAB_IEEE_32);
-  //
-  // Scan the arguments.
-  //
-  std::string coarFile, mediFile, fineFile;
-  std::string coarError, mediError;
-
-
-  pp.query("fineFile", fineFile);
-  if (fineFile.empty())
-    amrex::Abort("You must specify fineFile");
-
-  pp.query("mediFile", mediFile);
-  if (mediFile.empty())
-    amrex::Abort("You must specify mediFile");
-
-  pp.query("coarFile", coarFile);
-  if (coarFile.empty())
-    amrex::Abort("You must specify coarFile");
-
-
-  pp.query("mediError", mediError);
-  pp.query("coarError", coarError);
-
-  //l2 is not supported
-  for(int inorm = 0; inorm <=1; inorm++)
   {
-    Vector<Real> normsMedi, normsCoar;
-    Vector<string> namesMedi, namesCoar;
-    getErrorNorms(normsMedi, namesMedi, fineFile, mediFile, mediError, inorm, verbose);
-    getErrorNorms(normsCoar, namesCoar, mediFile, coarFile, coarError, inorm, verbose);
-    int ncompMedi = normsMedi.size();
-    int ncompCoar = normsCoar.size();
-    int ncomp = std::min(ncompMedi, ncompCoar);
-    amrex::Print() << "\\begin{table}[p]" << std::endl;
-    amrex::Print() << "\\begin{center}" << std::endl;
-    amrex::Print() << "\\begin{tabular}{|cccc|} \\hline" << std::endl;
-    amrex::Print() << "Variable & $e_{4h \\rightarrow 2h}$ & Order & $e_{2h \\rightarrow h}$\\\\" << std::endl;;
-    amrex::Print() << "\\hline " << std::endl;
 
-    for (int icomp = 0; icomp < ncomp; icomp++)
-    {
-      bool printOrder = false;
-      Real order;
-      Real finenorm = normsMedi[icomp];
-      Real coarnorm = normsCoar[icomp];
-      if(std::abs(finenorm) > 1.0e-40)
+      if (argc == 1)
+          PrintUsage(argv[0]);
+
+      ParmParse pp;
+
+      const std::string farg = amrex::get_command_argument(1);
+      if (farg == "-h" || farg == "--help")
+          PrintUsage(argv[0]);
+
+      bool verbose = false;
+      if (pp.contains("verbose"))
+          verbose = true;
+
+      bool latex = false;
+      if (pp.contains("latex"))
+          latex = true;
+
+      FArrayBox::setFormat(FABio::FAB_IEEE_32);
+      //
+      // Scan the arguments.
+      //
+      std::string coarFile, mediFile, fineFile;
+      std::string coarError, mediError;
+
+
+      pp.query("fineFile", fineFile);
+      if (fineFile.empty())
+          amrex::Abort("You must specify fineFile");
+
+      pp.query("mediFile", mediFile);
+      if (mediFile.empty())
+          amrex::Abort("You must specify mediFile");
+
+      pp.query("coarFile", coarFile);
+      if (coarFile.empty())
+          amrex::Abort("You must specify coarFile");
+
+
+      pp.query("mediError", mediError);
+      pp.query("coarError", coarError);
+
+      //l2 is not supported
+      for(int inorm = 0; inorm <=1; inorm++)
       {
-        order = log(std::abs(coarnorm/finenorm))/log(2.0);
-        printOrder = true;
+          Vector<Real> normsMedi, normsCoar;
+          Vector<string> namesMedi, namesCoar;
+
+          amrex::Print() << std::endl;
+          amrex::Print() << "Level  L"<< inorm << " norm of Error in Each Component" << std::endl
+                         << "-----------------------------------------------" << std::endl;
+
+          getErrorNorms(normsMedi, namesMedi, fineFile, mediFile, mediError, inorm, verbose, true);
+          getErrorNorms(normsCoar, namesCoar, mediFile, coarFile, coarError, inorm, verbose, false);
+          int ncompMedi = normsMedi.size();
+          int ncompCoar = normsCoar.size();
+          int ncomp = std::min(ncompMedi, ncompCoar);
+
+          if (latex) {
+              amrex::Print() << "\\begin{table}[p]" << std::endl;
+              amrex::Print() << "\\begin{center}" << std::endl;
+              amrex::Print() << "\\begin{tabular}{|cccc|} \\hline" << std::endl;
+              amrex::Print() << "Variable & $e_{4h \\rightarrow 2h}$ & Order & $e_{2h \\rightarrow h}$\\\\" << std::endl;;
+              amrex::Print() << "\\hline " << std::endl;
+          }
+
+          for (int icomp = 0; icomp < ncomp; icomp++)
+          {
+              bool printOrder = false;
+              Real order;
+              Real finenorm = normsMedi[icomp];
+              Real coarnorm = normsCoar[icomp];
+              if(std::abs(finenorm) > 1.0e-40)
+              {
+                  order = log(std::abs(coarnorm/finenorm))/log(2.0);
+                  printOrder = true;
+              }
+
+              amrex::Print() << setw(24) << namesMedi[icomp];
+              if (latex) {
+                  amrex::Print() << "&    \t ";
+              } else {
+                  amrex::Print() << "        ";
+              }
+              amrex::Print().SetPrecision(6) << setw(12) << std::right << std::scientific << normsCoar[icomp];
+              if (latex) {
+                  amrex::Print() << " & ";
+              } else {
+                  amrex::Print() << "   ";
+              }
+
+              if(printOrder)
+              {
+                  amrex::Print().SetPrecision(6)  << setw(12) << std::right << std::fixed << order;
+                  if (latex) {
+                      amrex::Print() << " & ";
+                  } else {
+                      amrex::Print() << "   ";
+                  }
+              }
+              else
+              {
+                  amrex::Print() << "------------ ";
+                  if (latex) {
+                      amrex::Print() << "& ";
+                  } else {
+                      amrex::Print() << "  ";
+                  }
+              }
+
+              amrex::Print().SetPrecision(6) << setw(12) << std::right << std::scientific << normsMedi[icomp];
+              if (latex) {
+                  amrex::Print() << " \\\\ " << std::endl;
+              } else {
+                  amrex::Print() << std::endl;
+              }
+
+          }
+
+          if (latex) {
+              amrex::Print() << "\\hline " << std::endl;
+              amrex::Print() << "\\end{tabular}" << std::endl;
+              amrex::Print() << "\\end{center}" << std::endl;
+              amrex::Print() << "\\caption{Solution error convergence rates using $L_";
+
+              if(inorm == 0)
+              {
+                  amrex::Print() <<"\\infty$ norm." << std::endl;;
+              }
+              else
+              {
+                  amrex::Print() << inorm << "$ norm.";
+              }
+              amrex::Print() << "}" << std::endl;
+              amrex::Print() << "\\end{table}" << std::endl;
+              amrex::Print() << std::endl << std::endl;
+          }
+
       }
 
-      amrex::Print() << namesMedi[icomp] << "&    \t ";
-      amrex::Print() << setw(12)
-                     << setprecision(6)
-                     << setiosflags(ios::showpoint)
-                     << setiosflags(ios::scientific)
-                     << normsCoar[icomp]  << " & ";
-      if(printOrder)
-      {
-        amrex::Print()      << setw(12)
-                            << setprecision(3)
-                            << setiosflags(ios::showpoint)
-                            << setiosflags(ios::scientific);
-        amrex::Print()  << order << " & ";
-      }
-      else
-      {
-        amrex::Print() << "------------ &";
-      }
-
-      amrex::Print() << setw(12)
-                     << setprecision(6)
-                     << setiosflags(ios::showpoint)
-                     << setiosflags(ios::scientific)
-                     << normsMedi[icomp];
-      amrex::Print() << " \\\\ " << std::endl;
-
-    }
-    amrex::Print() << "\\hline " << std::endl;
-    amrex::Print() << "\\end{tabular}" << std::endl;
-    amrex::Print() << "\\end{center}" << std::endl;
-    amrex::Print() << "\\caption{Solution error convergence rates using $L_";
-    if(inorm == 0)
-    {
-      amrex::Print() <<"\\infty$ norm." << std::endl;;
-    }
-    else
-    {
-      amrex::Print() << inorm << "$ norm.";
-    }
-    amrex::Print() << "}" << std::endl;
-    amrex::Print() << "\\end{table}" << std::endl;
-    amrex::Print() << std::endl << std::endl;
   }
-
-
   amrex::Finalize();
   return 0;
 }

@@ -1,5 +1,9 @@
 #ifndef BL_PROFILER_H_
 #define BL_PROFILER_H_
+#include <AMReX_Config.H>
+
+#define BL_PROFILE_PASTE2(x, y) x##y
+#define BL_PROFILE_PASTE(x, y) BL_PROFILE_PASTE2(x, y)
 
 #ifdef BL_PROFILING
 
@@ -11,15 +15,14 @@
 #include <AMReX_Box.H>
 #endif
 
-#include <iostream>
-#include <ostream>
+#include <list>
+#include <map>
+#include <iosfwd>
 #include <string>
 #include <stack>
 #include <set>
-#include <map>
-#include <list>
-#include <utility>
 #include <typeinfo>
+#include <utility>
 
 namespace amrex {
 
@@ -29,25 +32,25 @@ class BLProfiler
     struct ProfStats {
       ProfStats() : nCalls(0), totalTime(0.0), minTime(0.0),
                     maxTime(0.0), avgTime(0.0), variance(0.0) { }
-      long nCalls;
+      Long nCalls;
       Real totalTime, minTime, maxTime, avgTime, variance;
     };
 
     struct CallStats {
       CallStats() : callStackDepth(-2), csFNameNumber(-2),
                     nCSCalls(0), totalTime(0.0),
-		    stackTime(0.0), callTime(0.0)  { }
+                    stackTime(0.0), callTime(0.0)  { }
       CallStats(int depth, int fnamenumber) : callStackDepth(depth),
                                               csFNameNumber(fnamenumber),
                                               nCSCalls(0), totalTime(0.0),
-					      stackTime(0.0), callTime(0.0)  { }
+                                              stackTime(0.0), callTime(0.0)  { }
       CallStats(int depth, int fnamenumber, int ncalls, Real totaltime,
                 Real stacktime, Real calltime) : callStackDepth(depth),
                                                  csFNameNumber(fnamenumber),
                                                  nCSCalls(ncalls), totalTime(totaltime),
-					         stackTime(stacktime), callTime(calltime)  { }
+                                                 stackTime(stacktime), callTime(calltime)  { }
       int callStackDepth, csFNameNumber;
-      long nCSCalls;
+      Long nCSCalls;
       Real totalTime, stackTime, callTime;
 
       static int cstatsVersion;
@@ -63,9 +66,9 @@ class BLProfiler
 
     struct CallStatsPatch {
       CallStatsPatch() : seekPos(-1), callStats(), fileName("")        { }
-      CallStatsPatch(long spos, const CallStats &cs, const std::string &fname)
+      CallStatsPatch(Long spos, const CallStats &cs, const std::string &fname)
                        : seekPos(spos), callStats(cs), fileName(fname) { }
-      long seekPos;
+      Long seekPos;
       CallStats callStats;
       std::string fileName;
     };
@@ -180,7 +183,7 @@ class BLProfiler
     static void AddCommStat(const CommFuncType cft, const int size,
                             const int pid, const int tag);
     static void AddWait(const CommFuncType cft, const MPI_Request &reqs,
-		        const MPI_Status &status, const bool bc);
+                        const MPI_Status &status, const bool bc);
     static void AddWaitsome(const CommFuncType cft, const Vector<MPI_Request> &reqs,
                             const int completed, const Vector<MPI_Status> &status,
                             const bool bc);
@@ -318,23 +321,18 @@ namespace BLProfilerUtils {
 
   void WriteRow(std::ostream &os, const std::string &fname,
                 const BLProfiler::ProfStats &pstats, const Real percent,
-	        const int colWidth, const Real maxlen,
-	        const bool bwriteavg);
+                const int colWidth, const Real maxlen,
+                const bool bwriteavg);
 
   void WriteStats(std::ostream &os,
                   const std::map<std::string, BLProfiler::ProfStats> &mpStats,
-		  const std::map<std::string, int> &fnameNumbers,
-		  const Vector<BLProfiler::CallStats> &callTraces,
-		  bool bwriteavg = false, bool bwriteinclusivetimes = false);
+                  const std::map<std::string, int> &fnameNumbers,
+                  const Vector<BLProfiler::CallStats> &callTraces,
+                  bool bwriteavg = false, bool bwriteinclusivetimes = false);
 }
 
 
-inline std::ostream &operator<< (std::ostream &os, const BLProfiler::CommStats &cs) {
-  os << BLProfiler::CommStats::CFTToString(cs.cfType) << "   " << cs.size
-     << "  " << cs.commpid << "  " << cs.tag << "  " << cs.timeStamp;
-  return os;
-}
-
+std::ostream &operator<< (std::ostream &os, const BLProfiler::CommStats &cs);
 
 
 inline std::string BLProfiler::CommStats::CFTToString(CommFuncType cft) {
@@ -390,43 +388,43 @@ inline std::string BLProfiler::CommStats::CFTToString(CommFuncType cft) {
 }
 
 #define BL_PROFILE_INITIALIZE()  amrex::BLProfiler::Initialize();
-#define BL_PROFILE_INITPARAMS()  amrex::BLProfiler::InitParams();
+#define BL_PROFILE_INITPARAMS()  amrex::BLProfiler::InitParams(); amrex::BLProfileSync::InitParams()
 #define BL_PROFILE_FINALIZE()    amrex::BLProfiler::Finalize();
 
 #define BL_TINY_PROFILE_INITIALIZE()
 #define BL_TINY_PROFILE_FINALIZE()
 
-#define BL_PROFILE(fname) amrex::BLProfiler bl_profiler__((fname));
-#define BL_PROFILE_T(fname, T) amrex::BLProfiler bl_profiler__((std::string(fname) + typeid(T).name()));
+#define BL_PROFILE(fname) amrex::BLProfiler bl_profiler_((fname));
+#define BL_PROFILE_T(fname, T) amrex::BLProfiler bl_profiler_((std::string(fname) + typeid(T).name()));
 #ifdef BL_PROFILING_SPECIAL
-#define BL_PROFILE_S(fname) amrex::BLProfiler bl_profiler__((fname));
-#define BL_PROFILE_T_S(fname, T) amrex::BLProfiler bl_profiler__((std::string(fname) + typeid(T).name()));
+#define BL_PROFILE_S(fname) amrex::BLProfiler bl_profiler_((fname));
+#define BL_PROFILE_T_S(fname, T) amrex::BLProfiler bl_profiler_((std::string(fname) + typeid(T).name()));
 #else
 #define BL_PROFILE_S(fname)
 #define BL_PROFILE_T_S(fname, T)
 #endif
 
-#define BL_PROFILE_VAR(fname, vname) amrex::BLProfiler bl_profiler__##vname((fname));
-#define BL_PROFILE_VAR_NS(fname, vname) amrex::BLProfiler bl_profiler__##vname(fname, false);
-#define BL_PROFILE_VAR_START(vname) bl_profiler__##vname.start();
-#define BL_PROFILE_VAR_STOP(vname) bl_profiler__##vname.stop();
+#define BL_PROFILE_VAR(fname, vname) amrex::BLProfiler bl_profiler_##vname((fname));
+#define BL_PROFILE_VAR_NS(fname, vname) amrex::BLProfiler bl_profiler_##vname(fname, false);
+#define BL_PROFILE_VAR_START(vname) bl_profiler_##vname.start();
+#define BL_PROFILE_VAR_STOP(vname) bl_profiler_##vname.stop();
 
 #define BL_PROFILE_INIT_PARAMS(ptl,wall,wfabs)  \
     amrex::BLProfiler::InitParams(ptl,wall, wfabs);
 #define BL_PROFILE_ADD_STEP(snum)  amrex::BLProfiler::AddStep(snum);
 #define BL_PROFILE_SET_RUN_TIME(rtime)  amrex::BLProfiler::SetRunTime(rtime);
 
-#define BL_PROFILE_REGION(rname) amrex::BLProfileRegion bl_profile_region__##vname((rname));
+#define BL_PROFILE_REGION(rname) amrex::BLProfileRegion bl_profile_region_##vname((rname));
 
 #define BL_PROFILE_REGION_START(rname) amrex::BLProfiler::RegionStart(rname);
 #define BL_PROFILE_REGION_STOP(rname)  amrex::BLProfiler::RegionStop(rname);
 
 // these combine regions with profile variables
 #define BL_PROFILE_REGION_VAR(fname, rvname) amrex::BLProfiler::RegionStart(fname); \
-    amrex::BLProfiler bl_profiler__##rvname((fname));
+    amrex::BLProfiler bl_profiler_##rvname((fname));
 #define BL_PROFILE_REGION_VAR_START(fname, rvname) amrex::BLProfiler::RegionStart(fname); \
-                                            bl_profiler__##rvname.start();
-#define BL_PROFILE_REGION_VAR_STOP(fname, rvname)  bl_profiler__##rvname.stop();   \
+                                            bl_profiler_##rvname.start();
+#define BL_PROFILE_REGION_VAR_STOP(fname, rvname)  bl_profiler_##rvname.stop();   \
     amrex::BLProfiler::RegionStop(fname);
 
 #define BL_PROFILE_TINY_FLUSH()
@@ -470,36 +468,47 @@ inline std::string BLProfiler::CommStats::CFTToString(CommFuncType cft) {
 // --------------------------------------------
 #elif defined(AMREX_TINY_PROFILING)
 
+#include <AMReX.H>
 #include <AMReX_TinyProfiler.H>
 
 #define BL_PROFILE_INITIALIZE()
 #define BL_PROFILE_INITPARAMS()
 #define BL_PROFILE_FINALIZE()
 
-#define BL_TINY_PROFILE_INITIALIZE()   amrex::TinyProfiler::Initialize();
-#define BL_TINY_PROFILE_FINALIZE()     amrex::TinyProfiler::Finalize();
+#define BL_TINY_PROFILE_INITIALIZE()   amrex::TinyProfiler::Initialize(); amrex::BLProfileSync::InitParams()
+#define BL_TINY_PROFILE_FINALIZE()     amrex::TinyProfiler::Finalize()
 
-#define BL_PROFILE(fname)         amrex::TinyProfiler tiny_profiler__((fname));
+#define BL_PROFILE(fname) BL_PROFILE_IMPL(fname, __COUNTER__)
+#define BL_PROFILE_IMPL(funame, counter)  amrex::TinyProfiler BL_PROFILE_PASTE(tiny_profiler_, counter)((funame)); \
+    amrex::ignore_unused(BL_PROFILE_PASTE(tiny_profiler_, counter));
+
 #define BL_PROFILE_T(a, T)
 #define BL_PROFILE_S(fname)
 #define BL_PROFILE_T_S(fname, T)
 
-#define BL_PROFILE_VAR(fname, vname)      amrex::TinyProfiler tiny_profiler__##vname((fname));
-#define BL_PROFILE_VAR_NS(fname, vname)   amrex::TinyProfiler tiny_profiler__##vname(fname, false);
-#define BL_PROFILE_VAR_START(vname)       tiny_profiler__##vname.start();
-#define BL_PROFILE_VAR_STOP(vname)        tiny_profiler__##vname.stop();
+#define BL_PROFILE_VAR(fname, vname)                      amrex::TinyProfiler tiny_profiler_##vname((fname))
+#define BL_PROFILE_VAR_NS(fname, vname)                   amrex::TinyProfiler tiny_profiler_##vname(fname, false, false)
+#define BL_PROFILE_VAR_START(vname)                       tiny_profiler_##vname.start()
+#define BL_PROFILE_VAR_STOP(vname)                        tiny_profiler_##vname.stop()
+#ifdef AMREX_USE_CUPTI
+#include <AMReX_CuptiTrace.H>
+#define BL_PROFILE_VAR_NS_CUPTI(fname, vname)             amrex::TinyProfiler tiny_profiler_##vname(fname, false, true)
+#define BL_PROFILE_VAR_START_CUPTI(vname)                 tiny_profiler_##vname.start()
+#define BL_PROFILE_VAR_STOP_CUPTI(vname)                  tiny_profiler_##vname.stop()
+#define BL_PROFILE_VAR_STOP_CUPTI_ID(vname, uintID)       tiny_profiler_##vname.stop(uintID)
+#endif // AMREX_USE_CUPTI
 #define BL_PROFILE_INIT_PARAMS(ptl,wall,wfabs)
 #define BL_PROFILE_ADD_STEP(snum)
 #define BL_PROFILE_SET_RUN_TIME(rtime)
-#define BL_PROFILE_REGION(rname)          amrex::TinyProfileRegion tiny_profile_region__##vname((rname));
+#define BL_PROFILE_REGION(rname)          amrex::TinyProfileRegion tiny_profile_region_##vname((rname))
 #define BL_PROFILE_REGION_START(rname)
 #define BL_PROFILE_REGION_STOP(rname)
-//#define BL_PROFILE_REGION_START(rname)    amrex::TinyProfiler::StartRegion(rname);
-//#define BL_PROFILE_REGION_STOP(rname)     amrex::TinyProfiler::StopRegion(rname);
+//#define BL_PROFILE_REGION_START(rname)    amrex::TinyProfiler::StartRegion(rname)
+//#define BL_PROFILE_REGION_STOP(rname)     amrex::TinyProfiler::StopRegion(rname)
 #define BL_PROFILE_REGION_VAR(fname, rvname)
 #define BL_PROFILE_REGION_VAR_START(fname, rvname)
 #define BL_PROFILE_REGION_VAR_STOP(fname, rvname)
-#define BL_PROFILE_TINY_FLUSH() amrex::TinyProfiler::Finalize(true);
+#define BL_PROFILE_TINY_FLUSH() amrex::TinyProfiler::Finalize(true)
 #define BL_PROFILE_FLUSH()
 #define BL_TRACE_PROFILE_FLUSH()
 #define BL_TRACE_PROFILE_SETFLUSHSIZE(fsize)
@@ -515,17 +524,17 @@ namespace amrex {
 class BLProfiler
 {
   public:
-    explicit BLProfiler(const std::string &funcname) { }
+    explicit BLProfiler(const std::string &/*funcname*/) { }
     static void Initialize() { }
     static void InitParams() { }
     static void Finalize() { }
-    static void WriteStats(std::ostream &os) { }
+    static void WriteStats(std::ostream &/*os*/) { }
     static void WriteCommStats() { }
     void start() { }
     void stop() { }
-    static void InitParams(const Real ptl, const bool writeall,
-                           const bool writefabs) { }
-    static void AddStep(const int snum) { }
+    static void InitParams(const Real /*ptl*/, const bool /*writeall*/,
+                           const bool /*writefabs*/) { }
+    static void AddStep(const int /*snum*/) { }
 };
 
 }
@@ -587,6 +596,51 @@ class BLProfiler
 #define BL_COMM_PROFILE_TAGRANGE(tagmin, tagmax)
 #define BL_COMM_PROFILE_TAGWRAP()
 #define BL_COMM_PROFILE_INITAMR(flev, mlev, rr, pd)
+
+#endif
+
+// ============================================================
+// Sync macros
+// ============================================================
+
+#if (defined(BL_PROFILING) || defined(AMREX_TINY_PROFILING))
+
+namespace amrex {
+
+  class BLProfileSync {
+
+  public:
+    static void Sync() noexcept;
+    static void Sync(const std::string& name) noexcept;
+    static void Sync(const char* name) noexcept;
+
+    static void InitParams() noexcept;
+
+    static void StartSyncRegion() noexcept;
+    static void StartSyncRegion(const std::string& name) noexcept;
+    static void StartSyncRegion(const char* name) noexcept;
+    static void EndSyncRegion() noexcept;
+
+  private:
+    static int sync_counter;
+    static int use_prof_syncs;
+  };
+
+}
+
+#define BL_PROFILE_SYNC()                       amrex::BLProfileSync::Sync()
+#define BL_PROFILE_SYNC_TIMED(fname)            amrex::BLProfileSync::Sync(fname)
+#define BL_PROFILE_SYNC_START()                 amrex::BLProfileSync::StartSyncRegion()
+#define BL_PROFILE_SYNC_START_TIMED(fname)      amrex::BLProfileSync::StartSyncRegion(fname)
+#define BL_PROFILE_SYNC_STOP()                  amrex::BLProfileSync::EndSyncRegion()
+
+#else
+
+#define BL_PROFILE_SYNC()
+#define BL_PROFILE_SYNC_TIMED(fname)
+#define BL_PROFILE_SYNC_START()
+#define BL_PROFILE_SYNC_START_TIMED(fname)
+#define BL_PROFILE_SYNC_STOP()
 
 #endif
 

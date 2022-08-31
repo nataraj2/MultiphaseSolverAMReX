@@ -1,12 +1,14 @@
 
 #ifndef AMREX_MLCGSOLVER_H_
 #define AMREX_MLCGSOLVER_H_
-
-#include <cmath>
+#include <AMReX_Config.H>
 
 #include <AMReX_Vector.H>
 #include <AMReX_MultiFab.H>
 #include <AMReX_MLLinOp.H>
+
+#include <cmath>
+
 
 namespace amrex {
 
@@ -34,9 +36,14 @@ public:
     * 2 means iterations exceeded
     */
     int solve (MultiFab&       solnL,
-	       const MultiFab& rhsL,
-	       Real            eps_rel,
-	       Real            eps_abs);
+               const MultiFab& rhsL,
+               Real            eps_rel,
+               Real            eps_abs);
+
+    int solve (Any&       solnL,
+               const Any& rhsL,
+               Real       eps_rel,
+               Real       eps_abs);
 
     void setVerbose (int _verbose) { verbose = _verbose; }
     int getVerbose () const { return verbose; }
@@ -46,7 +53,7 @@ public:
 
     void setNGhost(int _nghost) {nghost = _nghost;}
     int getNGhost() {return nghost;}
-    
+
     Real dotxy (const MultiFab& r, const MultiFab& z, bool local = false);
     Real norm_inf (const MultiFab& res, bool local = false);
     int solve_bicgstab (MultiFab&       solnL,
@@ -58,6 +65,8 @@ public:
                   Real            eps_rel,
                   Real            eps_abs);
 
+    int getNumIters () const noexcept { return iter; }
+
 private:
 
     MLMG* mlmg;
@@ -65,9 +74,10 @@ private:
     Type solver_type;
     const int amrlev;
     const int mglev;
-    int    verbose   = 0;
-    int    maxiter   = 100;
+    int verbose   = 0;
+    int maxiter   = 100;
     int nghost = 0;
+    int iter = -1;
 };
 
 }

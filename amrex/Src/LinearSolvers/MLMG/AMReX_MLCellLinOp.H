@@ -1,7 +1,9 @@
 #ifndef AMREX_ML_CELL_LINOP_H_H
 #define AMREX_ML_CELL_LINOP_H_H
+#include <AMReX_Config.H>
 
 #include <AMReX_MLLinOp.H>
+#include <AMReX_iMultiFab.H>
 
 namespace amrex {
 
@@ -27,7 +29,10 @@ public:
                  const LPInfo& a_info = LPInfo(),
                  const Vector<FabFactory<FArrayBox> const*>& a_factory = {});
 
-    virtual void setLevelBC (int amrlev, const MultiFab* levelbcdata) final override;
+    virtual void setLevelBC (int amrlev, const MultiFab* levelbcdata,
+                             const MultiFab* robinbc_a = nullptr,
+                             const MultiFab* robinbc_b = nullptr,
+                             const MultiFab* robinbc_f = nullptr) final override;
 
     virtual bool needsUpdate () const override {
         return MLLinOp::needsUpdate();
@@ -105,6 +110,8 @@ public:
 
     virtual void interpolation (int amrlev, int fmglev, MultiFab& fine, const MultiFab& crse) const override;
 
+    virtual void interpAssign (int amrlev, int fmglev, MultiFab& fine, MultiFab& crse) const override;
+
     virtual void averageDownSolutionRHS (int camrlev, MultiFab& crse_sol, MultiFab& crse_rhs,
                                          const MultiFab& fine_sol, const MultiFab& fine_rhs) override;
 
@@ -124,13 +131,16 @@ public:
                          MultiFab& res, const MultiFab& crse_sol, const MultiFab&,
                          MultiFab&, MultiFab& fine_sol, const MultiFab&) const final override;
     virtual void compFlux (int amrlev, const Array<MultiFab*,AMREX_SPACEDIM>& fluxes,
-                           MultiFab& sol, Location loc) const final override;
+                           MultiFab& sol, Location loc) const override;
     virtual void compGrad (int amrlev, const Array<MultiFab*,AMREX_SPACEDIM>& grad,
                            MultiFab& sol, Location loc) const override;
 
-    virtual void applyMetricTerm (int amrlev, int mglev, MultiFab& rhs) const final override;
+    virtual void applyMetricTerm (int amrlev, int mglev, Any& rhs) const final override;
     virtual void unapplyMetricTerm (int amrlev, int mglev, MultiFab& rhs) const final override;
-    virtual void fillSolutionBC (int amrlev, MultiFab& sol, const MultiFab* crse_bcdata=nullptr) final override;
+    virtual Vector<Real> getSolvabilityOffset (int amrlev, int mglev,
+                                               Any const& rhs) const override;
+    virtual void fixSolvabilityByOffset (int amrlev, int mglev, Any& rhs,
+                                         Vector<Real> const& offset) const override;
 
     virtual void prepareForSolve () override;
 
@@ -141,6 +151,23 @@ public:
     virtual void FFlux (int amrlev, const MFIter& mfi,
                         const Array<FArrayBox*,AMREX_SPACEDIM>& flux,
                         const FArrayBox& sol, Location loc, const int face_only=0) const = 0;
+
+    // This could be turned into template if needed.
+    void applyMetricTermToMF (int amrlev, int mglev, MultiFab& rhs) const;
+
+    virtual Real AnyNormInfMask (int amrlev, Any const& a, bool local) const override;
+
+    virtual void AnyAvgDownResAmr (int clev, Any& cres, Any const& fres) const override;
+
+    virtual void AnyInterpolationAmr (int famrlev, Any& fine, const Any& crse,
+                                      IntVect const& /*nghost*/) const override;
+
+    virtual void AnyAverageDownAndSync (Vector<Any>& sol) const override;
+
+    struct BCTL {
+        BoundCond type;
+        Real location;
+    };
 
 protected:
 
@@ -161,10 +188,14 @@ protected:
     {
     public:
         BndryCondLoc (const BoxArray& ba, const DistributionMapping& dm, int ncomp);
+
         void setLOBndryConds (const Geometry& geom, const Real* dx,
                               const Vector<Array<BCType,AMREX_SPACEDIM> >& lobc,
                               const Vector<Array<BCType,AMREX_SPACEDIM> >& hibc,
-                              int ratio, const RealVect& a_loc);
+                              int ratio, const RealVect& interior_bloc,
+                              const Array<Real,AMREX_SPACEDIM>& domain_bloc_lo,
+                              const Array<Real,AMREX_SPACEDIM>& domain_bloc_hi);
+
         const Vector<BCTuple>& bndryConds (const MFIter& mfi) const noexcept {
             return bcond[mfi];
         }
@@ -177,18 +208,27 @@ protected:
         const RealTuple& bndryLocs (const MFIter& mfi, int icomp) const noexcept {
             return bcloc[mfi][icomp];
         }
+        GpuArray<BCTL,2*AMREX_SPACEDIM> const* getBCTLPtr (const MFIter& mfi) const noexcept {
+            return bctl[mfi];
+        }
     private:
         LayoutData<Vector<BCTuple> >   bcond;
         LayoutData<Vector<RealTuple> > bcloc;
+        LayoutData<GpuArray<BCTL,2*AMREX_SPACEDIM>*> bctl;
+        Gpu::DeviceVector<GpuArray<BCTL,2*AMREX_SPACEDIM> > bctl_dv;
         int m_ncomp;
     };
     Vector<Vector<std::unique_ptr<BndryCondLoc> > > m_bcondloc;
+
+    Vector<std::unique_ptr<MultiFab> > m_robin_bcval;
 
     // used to save interpolation coefficients of the first interior cells
     mutable Vector<Vector<BndryRegister> > m_undrrelxr;
 
     // boundary cell flags for covered, not_covered, outside_domain
     Vector<Vector<Array<MultiMask,2*AMREX_SPACEDIM> > > m_maskvals;
+
+    Vector<std::unique_ptr<iMultiFab> > m_norm_fine_mask;
 
     mutable Vector<YAFluxRegister> m_fluxreg;
 
@@ -197,6 +237,8 @@ private:
     void defineAuxData ();
     void defineBC ();
 
+    void computeVolInv () const;
+    mutable Vector<Vector<Real> > m_volinv; // used by solvability fix
 };
 
 }

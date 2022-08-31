@@ -1,14 +1,18 @@
 
 #ifndef BL_PARMPARSE_H
 #define BL_PARMPARSE_H
+#include <AMReX_Config.H>
 
+#include <AMReX_BLassert.H>
+#include <AMReX_TypeTraits.H>
+
+#include <set>
 #include <stack>
 #include <string>
 #include <iosfwd>
 #include <vector>
 #include <list>
 #include <array>
-#include <AMReX_BLassert.H>
 
 namespace amrex {
 
@@ -68,16 +72,16 @@ class IntVect;
 // remaining four values are integers indexed 2, 3, 4, and 5.
 //
 // For a string value to represent an integer or float it must fit the
-// following regular experssion:
+// following regular expression:
 //   Sign    ::= '+' | '-'
 //   Digit   ::= '0' | '1' | ... | '9'
 //   Integer ::= [Sign]Digit+
 //   Exp     ::= ('e'|'E')Integer
 //   Float   ::= ( Integer[.Digit*][Exp] | [Integer].Digit+[Exp] )
 //
-// Where '+' indicates one or more occurences, '*' represents zero or
-// more occurences, '|' means one or the other and '[]' represents zero
-// or one occurence.
+// Where '+' indicates one or more occurrences, '*' represents zero or
+// more occurrences, '|' means one or the other and '[]' represents zero
+// or one occurrence.
 //
 // Note that floats and doubles have the same string representation and
 // that the FORTRAN "double" exponent format is not supported.
@@ -234,6 +238,26 @@ class IntVect;
 *     test = apple "boy blue" 10 20 30 40
 *
 *     FILE = prob_file
+*
+*  Preprocessing of AMREX_SPACEDIM is supported. It supports #if, #elif,
+*  #else, and #endif.  The condition must be `AMREX_SPACEDIM op D`, where op
+*  is >, <, >=, <=, or ==, and D is 1, 2, or 3. The parentheses around the
+*  condition are optional. Some examples are shown below.
+*
+*    #if (AMREX_SPACEDIM == 1)
+*    n_cell = 256
+*    #elif (AMREX_SPACEDIM == 2)
+*    n_cell = 128 128
+*    #else
+*    n_cell = 64 64 64
+*    #endif
+*
+*    #if AMREX_SPACEDIM >= 2
+*    t = 0.5
+*    #else
+*    t = 1.5
+*    #endif
+*
 */
 
 class ParmParse
@@ -250,12 +274,18 @@ public:
     * for this particular ParmParse object.
     */
     explicit ParmParse (const std::string& prefix = std::string());
+
+    // To avoid error: definition of implicit copy constructor for
+    // 'ParmParse' is deprecated because it has a user-declared copy
+    // assignment operator.
+    ParmParse (ParmParse const& rhs) = default;
+
     //! Returns true if name is in table.
     bool contains (const char* name) const;
     /**
-    * \brief Returns the number of values associated with nth occurence of
+    * \brief Returns the number of values associated with nth occurrence of
     * name (prepended with the prefix) in the table.  n == -1 implies
-    * the last occurence.
+    * the last occurrence.
     */
     int countval (const char* name,
                   int         n = LAST) const;
@@ -383,6 +413,41 @@ public:
               const long  val);
     /**
     * \brief Get the ival'th value of kth occurrence of the requested name.
+    * If successful, the value is converted to an int and stored
+    * in reference ref.  If the kth occurrence does not exist or
+    * ival'th value does not exist, or if the printed representation
+    * of the value cannot be converted to an int, an error message is
+    * output and the program halts.   Note that ival == 0 is the first
+    * value in the list.
+    */
+    void getkth (const char* name,
+                 int         k,
+                 long long&  ref,
+                 int         ival = FIRST) const;
+    //! Same as getkth() but searches for the last occurrence of name.
+    void get (const char* name,
+              long long&  ref,
+              int         ival = FIRST) const;
+    /**
+    * \brief Similar to getkth() but returns 0 if there is no kth occurrence
+    * of name.  If successful, it returns 1 and stores the value in
+    * ref.  If the kth occurrence exists, but ival'th value of that
+    * occurrence does not, or if there is a type mismatch, then the
+    * program signals an error and halts.
+    */
+    int querykth (const char* name,
+                  int         k,
+                  long long&  ref,
+                  int         ival = FIRST) const;
+    //! Same as querykth() but searches for the last occurrence of name.
+    int query (const char* name,
+               long long&  ref,
+               int         ival = FIRST) const;
+    //! Add a key 'name'with value 'ref' to the end of the PP table.
+    void add (const char* name,
+              const long long  val);
+    /**
+    * \brief Get the ival'th value of kth occurrence of the requested name.
     * If successful, the value is converted to a float and stored
     * in reference ref.  If the kth occurrence does not exist or
     * ival'th value does not exist, or if the printed representation
@@ -487,6 +552,13 @@ public:
     //! Add a key 'name'with value 'ref' to the end of the PP table.
     void add (const char* name,
               const std::string&  val);
+
+    //! keyword for files to load
+    static std::string FileKeyword;
+
+    //! Add keys and values from a file to the end of the PP table.
+    static void addfile (std::string const filename);
+
     /**
     * \brief Get the ival'th value of kth occurrence of the requested name.
     * If successful, the value is converted to an IntVect and stored
@@ -630,6 +702,43 @@ public:
     //! Add a key 'name' with vector of values 'ptr' to the end of the PP table.
     void addarr (const char* name,
                 const std::vector<long>&  ptr);
+
+    /**
+    * \brief Gets an std::vector\<long long\> of num_val values from kth occurrence of
+    * given name.  If successful, the values are converted to a long long
+    * and stored in the std::vector\<long long\> object ref.  ref is resized (if
+    * necessary) to hold num_val values.  The value in the list
+    * indexed by start_ix is copied into std::vector\<long long\>[0], std::vector\<long long\>[1]
+    * holds start_ix+1, etc.  If the kth occurrence does not exist
+    * or there are fewer than start_ix + num_val values associated
+    * with the kth occurrence, or if some of the values cannot be
+    * converted to a long long, an error message is reported and the
+    * program halts.
+    */
+    void getktharr (const char* name,
+                    int         k,
+                    std::vector<long long>& ref,
+                    int         start_ix = FIRST,
+                    int         num_val = ALL) const;
+    //! Same as getktharr() but searches for last occurrence of name.
+    void getarr (const char* name,
+                 std::vector<long long>& ref,
+                 int         start_ix = FIRST,
+                 int         num_val = ALL) const;
+    //! queryktharr() is to querykth() as getktharr() is to getkth().
+    int queryktharr (const char* name,
+                     int         k,
+                     std::vector<long long>& ref,
+                     int         start_ix = FIRST,
+                     int         num_val = ALL) const;
+    //! Same as queryktharr() but searches for last occurrence of name.
+    int queryarr (const char* name,
+                  std::vector<long long>& ref,
+                  int         start_ix = FIRST,
+                  int         num_val = ALL) const;
+    //! Add a key 'name' with vector of values 'ptr' to the end of the PP table.
+    void addarr (const char* name,
+                const std::vector<long long>&  ptr);
 
     /**
     * \brief Gets an std::vector\<float\> of num_val values from kth occurrence of
@@ -836,29 +945,119 @@ public:
     }
 
     /**
+     * \brief If `name` is found, the value in the ParmParse database will
+     * be stored in the `ref` argument.  If not, the value in `ref` will be
+     * added to the ParmParse database.  The return value indicates if it
+     * existed previously.
+     */
+    template <typename T, std::enable_if_t<!IsStdVector<T>::value, int> = 0>
+    int queryAdd (const char* name, T& ref) {
+        int exist = this->query(name, ref);
+        if (!exist) {
+            this->add(name, ref);
+        }
+        return exist;
+    }
+
+    int queryAdd (const char* name, std::string& ref) {
+        int exist = this->query(name, ref);
+        if (!exist && !ref.empty()) {
+            this->add(name, ref);
+        }
+        return exist;
+    }
+
+    /**
+     * \brief If `name` is found, the value in the ParmParse database will
+     * be stored in the `ref` argument.  If not, the value in `ref` will be
+     * added to the ParmParse database.  The return value indicates if it
+     * existed previously.
+     */
+    template <typename T>
+    int queryAdd (const char* name, std::vector<T>& ref) {
+        int exist = this->queryarr(name, ref);
+        if (!exist && !ref.empty()) {
+            this->addarr(name, ref);
+        }
+        return exist;
+    }
+
+    /**
+     * \brief If `name` is found, the value in the ParmParse database will
+     * be stored in the `ref` argument.  If not, the value in `ref` will be
+     * added to the ParmParse database.  The return value indicates if it
+     * existed previously.
+     */
+    template <typename T>
+    int queryAdd (const char* name, std::vector<T>& ref, int num_val) {
+        int exist = this->queryarr(name, ref, 0, num_val);
+        if (!exist) {
+            this->addarr(name, ref);
+        }
+        return exist;
+    }
+
+    /**
+     * \brief If `name` is found, the value in the ParmParse database will
+     * be stored in the `ref` argument.  If not, the value in `ref` will be
+     * added to the ParmParse database.  The return value indicates if it
+     * existed previously.
+     */
+    template <typename T, std::size_t N>
+    int queryAdd (const char* name, std::array<T,N>& ref) {
+        std::vector<T> v;
+        int exist = this->queryarr(name, v);
+        if (exist) {
+            AMREX_ALWAYS_ASSERT(v.size() >= N);
+            for (std::size_t i = 0; i < N; ++i) {
+                ref[i] = v[i];
+            }
+        } else {
+            v.resize(N);
+            for (std::size_t i = 0; i < N; ++i) {
+                v[i] = ref[i];
+            }
+            this->addarr(name, v);
+        }
+        return exist;
+    }
+
+    //! Remove given name from the table.
+    int remove (const char* name);
+
+    /**
     * \brief Construct an initial ParmParse object from the argc and argv
     * passed in to main().  An error will be signalled if another
     * ParmParse object currently exists.  If parfile is specified,
     * read the parameters in from that file first and then append
-    * those derived from argv to the table.  If prefix is specified,
-    * load this string as the code prefix for this particular
-    * ParmParse object.
+    * those derived from argv to the table.
     */
     static void Initialize(int         argc,
-			   char**      argv,
-			   const char* parfile);
+                           char**      argv,
+                           const char* parfile);
     /**
     * \brief The destructor.  The internal static table will only be deleted
     * if there are no other ParmParse objects in existence.
     */
     static void Finalize();
 
+    static bool QueryUnusedInputs ();
+
+    //! Any unused [prefix.]* parameters?
+    static bool hasUnusedInputs (const std::string& prefix = std::string());
+
+    //! Returns unused [prefix.]* parameters.
+    static std::vector<std::string> getUnusedInputs (const std::string& prefix = std::string());
+
+    //! Returns [prefix.]* parameters.
+    static std::set<std::string> getEntries (const std::string& prefix = std::string());
+
     struct PP_entry;
-    typedef std::list<PP_entry> Table;
+    using Table = std::list<PP_entry>;
     static void appendTable(ParmParse::Table& tab);
     const Table& table() const {return m_table;}
 
-private:
+protected:
     //
     // Don't allow one ParmParse object to be assigned to another.
     // Given that we use a const reference for "m_table" there's
@@ -869,12 +1068,12 @@ private:
     // clearer than the one generated by the default compiler-generated
     // assignment operator.
     //
-    ParmParse& operator= (const ParmParse& rhs);
+    ParmParse& operator= (const ParmParse& rhs) = delete;
 
     friend class Frame;
     friend class Record;
 
-    explicit ParmParse (const Table& tbl);
+    explicit ParmParse (Table& tbl);
     //
     //! Set/Get the prefix.
     std::string getPrefix() const;
@@ -885,7 +1084,7 @@ private:
     //
     //! Prefix used in keyword search.
     std::stack<std::string> m_pstack;
-    const Table& m_table;
+    Table& m_table;
 };
 
 struct ParmParse::PP_entry
@@ -895,7 +1094,7 @@ struct ParmParse::PP_entry
     PP_entry (const std::string& name,
               const std::string& vals);
     PP_entry (const std::string& name,
-	      const Table& table);
+              const Table& table);
     PP_entry (const PP_entry& pe);
     PP_entry& operator= (const PP_entry& pe);
     ~PP_entry ();
