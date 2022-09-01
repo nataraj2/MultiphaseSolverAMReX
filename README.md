@@ -34,8 +34,8 @@ and checkpoint (restart) files are written.
 5. `amr.blocking_factor` is the blocking factor. Defines the size of the blocks.
 
 # Visualization
-VisIt 2.13 is the minimum version needed for visualization. The AMReX files cannot 
-be read by the earlier versions of VisIt. In the running directory, do
+VisIt 2.13 is the minimum version needed for visualization. The earlier versions of VisIt
+cannot read the AMReX output. In the running directory, do
 ```
 sh run_output.sh
 ```
