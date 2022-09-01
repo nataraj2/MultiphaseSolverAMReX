@@ -42,6 +42,18 @@ sh run_output.sh
 This script will create a text file `movie.visit` (which contains a list of headers of the solution files - which has all 
 the flow variables). This also creates a directory `ensight-3D`, in which all plic data is 
 written. A file `plic.visit` is also written inside `ensight-3D`. Both `movie.visit` and `plic.visit`
- can be loaded simultaneously into VisIt and visualized.
+ can be loaded simultaneously into VisIt and visualized. The steps are as follows
+
+1. sh run_output,sh
+2. File-> Open file -> movie.visit
+3. File-> Open file -> enisght-3D/plic.visit
+4. In the active source bar choose movie.visit. Then Add->Mesh->mesh
+5. In the active source bar choose plic.visit. Then Add->Mesh->mesh
+VisIt will ask if a correlation should be setup. Click Yes. This will allow the plic and the mesh to 
+change simultaneously.
+6. In the Active time slider choose Correlation01.
+7. Click the right arrow button below the Active time slider to animate.
+
+
 
 
