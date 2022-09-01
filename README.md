@@ -44,7 +44,7 @@ the flow variables). This also creates a directory `ensight-3D`, in which all pl
 written. A file `plic.visit` is also written inside `ensight-3D`. Both `movie.visit` and `plic.visit`
  can be loaded simultaneously into VisIt and visualized. The steps are as follows
 
-1. sh run_output,sh
+1. sh run_output.sh
 2. File-> Open file -> movie.visit
 3. File-> Open file -> enisght-3D/plic.visit
 4. In the active source bar choose movie.visit. Then Add->Mesh->mesh
