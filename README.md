@@ -47,11 +47,11 @@ written. A file `plic.visit` is also written inside `ensight-3D`. Both `movie.vi
 1. sh run_output.sh
 2. File-> Open file -> movie.visit
 3. File-> Open file -> enisght-3D/plic.visit
-4. In the Active source -> movie.visit. Add->Mesh->mesh
-5. In the Active source -> plic.visit. Add->Mesh->mesh
+4. Active source -> movie.visit. Add->Mesh->mesh
+5. Active source -> plic.visit. Add->Mesh->mesh
 6. VisIt will ask if a correlation should be setup. Click Yes. This will allow the plic and the mesh to 
 change simultaneously
-7. In the Active time slider -> Correlation01
+7. Active time slider -> Correlation01
 8. Click Draw
 9. Click the right arrow button below the Active time slider to animate
 
