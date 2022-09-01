@@ -35,7 +35,7 @@ and checkpoint (restart) files are written.
 
 # Visualization
 VisIt 2.13 is the minimum version needed for visualization. The earlier versions of VisIt
-cannot read the AMReX output. In the running directory, do
+cannot read the AMReX output files. In the running directory, do
 ```
 sh run_output.sh
 ```
