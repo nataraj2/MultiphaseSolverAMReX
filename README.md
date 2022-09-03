@@ -34,14 +34,27 @@ and checkpoint (restart) files are written.
 5. `amr.blocking_factor` is the blocking factor. Defines the size of the blocks.
 
 # Visualization
-VisIt 2.13 is the minimum version needed for visualization. The AMReX files cannot 
-be read by the earlier versions of VisIt. In the running directory, do
+VisIt 2.13 is the minimum version needed for visualization. The earlier versions of VisIt
+cannot read the AMReX output files. In the running directory, do
 ```
 sh run_output.sh
 ```
 This script will create a text file `movie.visit` (which contains a list of headers of the solution files - which has all 
 the flow variables). This also creates a directory `ensight-3D`, in which all plic data is 
 written. A file `plic.visit` is also written inside `ensight-3D`. Both `movie.visit` and `plic.visit`
- can be loaded simultaneously into VisIt and visualized.
+ can be loaded simultaneously into VisIt and visualized. The steps are as follows
+
+1. `sh run_output.sh`
+2. File-> Open file -> movie.visit
+3. File-> Open file -> enisght-3D/plic.visit
+4. Active source -> movie.visit. Add->Mesh->mesh
+5. Active source -> plic.visit. Add->Mesh->mesh
+6. VisIt will ask if a correlation should be setup. Click Yes. This will allow the plic and the mesh to 
+change simultaneously
+7. Active time slider -> Correlation01
+8. Click Draw
+9. Click the right arrow button below the Active time slider to animate
+
+
 
 
