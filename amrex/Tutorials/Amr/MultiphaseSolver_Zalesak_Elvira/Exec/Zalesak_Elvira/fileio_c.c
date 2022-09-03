@@ -79,9 +79,6 @@ void binary_file_rewind_(int* unit, int* ierr){
 void binary_file_rewind__(int* unit, int* ierr){
   BINARY_FILE_REWIND(unit, ierr);
 }
-
-
-
 void binary_file_write_int(int* unit, const int* buffer, int* count, int* size, int* ierr){
   BINARY_FILE_WRITE_INT(unit, buffer, count, size, ierr);
 }
@@ -91,7 +88,6 @@ void binary_file_write_int_(int* unit, const int* buffer, int* count, int* size,
 void binary_file_write_int__(int* unit, const int* buffer, int* count, int* size, int* ierr){
   BINARY_FILE_WRITE_INT(unit, buffer, count, size, ierr);
 }
-
 void binary_file_write_char(int* unit, const char* buffer, int* count, int* size, int* ierr){
   BINARY_FILE_WRITE_CHAR(unit, buffer, count, size, ierr);
 }
@@ -101,7 +97,6 @@ void binary_file_write_char_(int* unit, const char* buffer, int* count, int* siz
 void binary_file_write_char__(int* unit, const char* buffer, int* count, int* size, int* ierr){
   BINARY_FILE_WRITE_CHAR(unit, buffer, count, size, ierr);
 }
-
 void binary_file_write_float(int* unit, const float* buffer, int* count, int* size, int* ierr){
   BINARY_FILE_WRITE_FLOAT(unit, buffer, count, size, ierr);
 }
@@ -111,8 +106,6 @@ void binary_file_write_float_(int* unit, const float* buffer, int* count, int* s
 void binary_file_write_float__(int* unit, const float* buffer, int* count, int* size, int* ierr){
   BINARY_FILE_WRITE_FLOAT(unit, buffer, count, size, ierr);
 }
-
-
 void binary_file_write_(int* unit, const void* buffer, int* count, int* size, int* ierr){
   BINARY_FILE_WRITE(unit, buffer, count, size, ierr);
 }
