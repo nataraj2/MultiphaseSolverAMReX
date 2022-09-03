@@ -23,7 +23,7 @@ F90 := /opt/local/bin/mpif90
 #   AMReX uses MPI in both C++ and Fortran.  Because CXX is used for linking, you MAY need to 
 #   provide path to MPI Fortran library.
 #LIBRARIES += -lmpif90
-LIBRARIES += -L/opt/local/lib -L$(IRLDIR)/lib -L$(IRLDIR)/install/absl/lib  -lirl_c -lirl -lirl_fortran -labsl_all -framework CoreFoundation
+LIBRARIES += -L/opt/local/lib -L$(IRLDIR)/install/lib -L$(IRLDIR)/install/absl/lib  -lirl_c -lirl -lirl_fortran -labsl_all -framework CoreFoundation
 
 # Always have verbosity on even if GNUmakefile set it to FALSE.
 VERBOSE=TRUE
