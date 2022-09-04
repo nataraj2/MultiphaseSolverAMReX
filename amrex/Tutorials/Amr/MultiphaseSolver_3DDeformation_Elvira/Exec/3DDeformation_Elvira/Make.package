@@ -1,0 +1,3 @@
+F90EXE_sources = face_velocity_3d.F90
+f90EXE_sources += fileio.f90
+cEXE_sources += fileio_c.c
