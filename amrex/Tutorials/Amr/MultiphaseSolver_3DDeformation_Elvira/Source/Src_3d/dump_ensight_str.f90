@@ -81,24 +81,24 @@ subroutine dump_ensight_str_plic(prob_lo,prob_hi,step)
            call BINARY_FILE_OPEN(iunit,trim(file),"a",ierr)
            ! Part header
            cbuffer = 'part'
-           call BINARY_FILE_WRITE(iunit,cbuffer,80,kind(cbuffer),ierr)
+           call BINARY_FILE_WRITE_CHAR(iunit,cbuffer,80,kind(cbuffer),ierr)
            ibuffer = irank
-           call BINARY_FILE_WRITE(iunit,ibuffer,1,kind(ibuffer),ierr)
+           call BINARY_FILE_WRITE_INT(iunit,ibuffer,1,kind(ibuffer),ierr)
            cbuffer = 'NGA 3D PLIC geometry per processor'
-           call BINARY_FILE_WRITE(iunit,cbuffer,80,kind(cbuffer),ierr)
+           call BINARY_FILE_WRITE_CHAR(iunit,cbuffer,80,kind(cbuffer),ierr)
            ! Position of my nodes
            cbuffer = 'coordinates'
-           call BINARY_FILE_WRITE(iunit,cbuffer,80,kind(cbuffer),ierr) 
+           call BINARY_FILE_WRITE_CHAR(iunit,cbuffer,80,kind(cbuffer),ierr) 
            ibuffer = nNodes
-           call BINARY_FILE_WRITE(iunit,ibuffer,1,kind(ibuffer),ierr)
-           call BINARY_FILE_WRITE(iunit,xNode(1:nNodes),nNodes,kind(xNode),ierr)
-           call BINARY_FILE_WRITE(iunit,yNode(1:nNodes),nNodes,kind(yNode),ierr)
-           call BINARY_FILE_WRITE(iunit,zNode(1:nNodes),nNodes,kind(zNode),ierr)
+           call BINARY_FILE_WRITE_INT(iunit,ibuffer,1,kind(ibuffer),ierr)
+           call BINARY_FILE_WRITE_FLOAT(iunit,xNode(1:nNodes),nNodes,kind(xNode),ierr)
+           call BINARY_FILE_WRITE_FLOAT(iunit,yNode(1:nNodes),nNodes,kind(yNode),ierr)
+           call BINARY_FILE_WRITE_FLOAT(iunit,zNode(1:nNodes),nNodes,kind(zNode),ierr)
            ! Write header
            cbuffer = 'tria3'
-           call BINARY_FILE_WRITE(iunit,cbuffer,80,kind(cbuffer),ierr)
+           call BINARY_FILE_WRITE_CHAR(iunit,cbuffer,80,kind(cbuffer),ierr)
            ibuffer = nZones
-           call BINARY_FILE_WRITE(iunit,ibuffer,1,kind(ibuffer),ierr)
+           call BINARY_FILE_WRITE_INT(iunit,ibuffer,1,kind(ibuffer),ierr)
            ! Write my triangles
            call BINARY_FILE_WRITE(iunit,nodeList(1:nZones),3*nZones,kind(nodeList),ierr)
            ! Close the file
@@ -125,7 +125,7 @@ subroutine dump_ensight_str_plic_headers(prob_lo,prob_hi,step)
   character(len=str_medium) :: file
   character(len=80) :: cbuffer,str
   integer :: ibuffer
-  real(SP) :: rbuffer
+  real(SP), allocatable :: rbuffer(:)
  
   double precision :: prob_lo(3), prob_hi(3)
   integer :: irank, iroot, nproc
@@ -197,24 +197,25 @@ subroutine dump_ensight_str_plic_headers(prob_lo,prob_hi,step)
            ! Open the file
            call BINARY_FILE_OPEN(iunit,trim(file),"w",ierr)
            cbuffer = 'C Binary'
-           call BINARY_FILE_WRITE(iunit,cbuffer,80,kind(cbuffer),ierr)
+           call BINARY_FILE_WRITE_CHAR(iunit,cbuffer,80,kind(cbuffer),ierr)
            cbuffer = 'Ensight Gold Geometry File'
-           call BINARY_FILE_WRITE(iunit,cbuffer,80,kind(cbuffer),ierr)
+           call BINARY_FILE_WRITE_CHAR(iunit,cbuffer,80,kind(cbuffer),ierr)
            cbuffer = 'PLIC Mesh from NGA'
-           call BINARY_FILE_WRITE(iunit,cbuffer,80,kind(cbuffer),ierr)
+           call BINARY_FILE_WRITE_CHAR(iunit,cbuffer,80,kind(cbuffer),ierr)
            cbuffer = 'node id off'
-           call BINARY_FILE_WRITE(iunit,cbuffer,80,kind(cbuffer),ierr)
+           call BINARY_FILE_WRITE_CHAR(iunit,cbuffer,80,kind(cbuffer),ierr)
            cbuffer = 'element id off'
-           call BINARY_FILE_WRITE(iunit,cbuffer,80,kind(cbuffer),ierr)
+           call BINARY_FILE_WRITE_CHAR(iunit,cbuffer,80,kind(cbuffer),ierr)
            cbuffer = 'extents'
-           call BINARY_FILE_WRITE(iunit,cbuffer,80,kind(cbuffer),ierr)
+           call BINARY_FILE_WRITE_CHAR(iunit,cbuffer,80,kind(cbuffer),ierr)
+           allocate(rbuffer(1))
 	   !!!!!!!!!!!!!!!
-           rbuffer = prob_lo(1); call BINARY_FILE_WRITE(iunit,rbuffer,1,kind(rbuffer),ierr)
-           rbuffer = prob_hi(1); call BINARY_FILE_WRITE(iunit,rbuffer,1,kind(rbuffer),ierr)
-           rbuffer = prob_lo(2); call BINARY_FILE_WRITE(iunit,rbuffer,1,kind(rbuffer),ierr)
-           rbuffer = prob_hi(2); call BINARY_FILE_WRITE(iunit,rbuffer,1,kind(rbuffer),ierr)
-           rbuffer = prob_lo(3); call BINARY_FILE_WRITE(iunit,rbuffer,1,kind(rbuffer),ierr)
-           rbuffer = prob_hi(3); call BINARY_FILE_WRITE(iunit,rbuffer,1,kind(rbuffer),ierr)
+           rbuffer(1) = prob_lo(1); call BINARY_FILE_WRITE_FLOAT(iunit,rbuffer,1,kind(rbuffer),ierr)
+           rbuffer = prob_hi(1); call BINARY_FILE_WRITE_FLOAT(iunit,rbuffer,1,kind(rbuffer),ierr)
+           rbuffer = prob_lo(2); call BINARY_FILE_WRITE_FLOAT(iunit,rbuffer,1,kind(rbuffer),ierr)
+           rbuffer = prob_hi(2); call BINARY_FILE_WRITE_FLOAT(iunit,rbuffer,1,kind(rbuffer),ierr)
+           rbuffer = prob_lo(3); call BINARY_FILE_WRITE_FLOAT(iunit,rbuffer,1,kind(rbuffer),ierr)
+           rbuffer = prob_hi(3); call BINARY_FILE_WRITE_FLOAT(iunit,rbuffer,1,kind(rbuffer),ierr)
 		
            call BINARY_FILE_CLOSE(iunit,ierr)
       end if

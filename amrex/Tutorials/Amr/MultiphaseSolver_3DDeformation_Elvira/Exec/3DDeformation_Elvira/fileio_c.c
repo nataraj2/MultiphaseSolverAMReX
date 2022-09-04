@@ -38,6 +38,11 @@ void BINARY_FILE_OPEN(int* unit, const char* file, const char* mode, int* ierr, 
 void BINARY_FILE_CLOSE(int* unit, int* ierr);
 void BINARY_FILE_REWIND(int* unit, int* ierr);
 void BINARY_FILE_WRITE(int* unit, const void* buffer, int* count, int* size, int* ierr);
+
+void BINARY_FILE_WRITE_INT(int* unit, const int* buffer, int* count, int* size, int* ierr);
+void BINARY_FILE_WRITE_CHAR(int* unit, const char* buffer, int* count, int* size, int* ierr);
+void BINARY_FILE_WRITE_FLOAT(int* unit, const float* buffer, int* count, int* size, int* ierr);
+
 void BINARY_FILE_READ(int* unit, void* buffer, int* count, int* size, int* ierr);
 void BINARY_BIGFILE_WRITE(int* unit, const void* buffer, long* count, int* size, int* ierr);
 void BINARY_BIGFILE_READ(int* unit, void* buffer, long* count, int* size, int* ierr);
@@ -74,8 +79,32 @@ void binary_file_rewind_(int* unit, int* ierr){
 void binary_file_rewind__(int* unit, int* ierr){
   BINARY_FILE_REWIND(unit, ierr);
 }
-void binary_file_write(int* unit, const void* buffer, int* count, int* size, int* ierr){
-  BINARY_FILE_WRITE(unit, buffer, count, size, ierr);
+void binary_file_write_int(int* unit, const int* buffer, int* count, int* size, int* ierr){
+  BINARY_FILE_WRITE_INT(unit, buffer, count, size, ierr);
+}
+void binary_file_write_int_(int* unit, const int* buffer, int* count, int* size, int* ierr){
+  BINARY_FILE_WRITE_INT(unit, buffer, count, size, ierr);
+}
+void binary_file_write_int__(int* unit, const int* buffer, int* count, int* size, int* ierr){
+  BINARY_FILE_WRITE_INT(unit, buffer, count, size, ierr);
+}
+void binary_file_write_char(int* unit, const char* buffer, int* count, int* size, int* ierr){
+  BINARY_FILE_WRITE_CHAR(unit, buffer, count, size, ierr);
+}
+void binary_file_write_char_(int* unit, const char* buffer, int* count, int* size, int* ierr){
+  BINARY_FILE_WRITE_CHAR(unit, buffer, count, size, ierr);
+}
+void binary_file_write_char__(int* unit, const char* buffer, int* count, int* size, int* ierr){
+  BINARY_FILE_WRITE_CHAR(unit, buffer, count, size, ierr);
+}
+void binary_file_write_float(int* unit, const float* buffer, int* count, int* size, int* ierr){
+  BINARY_FILE_WRITE_FLOAT(unit, buffer, count, size, ierr);
+}
+void binary_file_write_float_(int* unit, const float* buffer, int* count, int* size, int* ierr){
+  BINARY_FILE_WRITE_FLOAT(unit, buffer, count, size, ierr);
+}
+void binary_file_write_float__(int* unit, const float* buffer, int* count, int* size, int* ierr){
+  BINARY_FILE_WRITE_FLOAT(unit, buffer, count, size, ierr);
 }
 void binary_file_write_(int* unit, const void* buffer, int* count, int* size, int* ierr){
   BINARY_FILE_WRITE(unit, buffer, count, size, ierr);
@@ -206,6 +235,78 @@ void BINARY_FILE_WRITE(int* unit, const void* buffer, int* count, int* size,  in
   *ierr = 0;
   return;
 }
+
+
+/* Write to a file */
+void BINARY_FILE_WRITE_INT(int* unit, const int* buffer, int* count, int* size,  int* ierr){
+  
+  int i,n;
+  unsigned char* tmp;
+  char* pos;
+  
+  tmp = malloc(*size);
+  pos = (char*) buffer;
+  
+  for (n=0; n<*count; n++){
+    memcpy(tmp,pos,*size);
+    for (i=0; i<*size; i++){
+      fputc(tmp[i], fp[*unit]);
+    }
+    pos += *size;
+  }
+  
+  free(tmp);
+  *ierr = 0;
+  return;
+}
+
+/* Write to a file */
+void BINARY_FILE_WRITE_CHAR(int* unit, const char* buffer, int* count, int* size,  int* ierr){
+  
+  int i,n;
+  unsigned char* tmp;
+  char* pos;
+  
+  tmp = malloc(*size);
+  pos = (char*) buffer;
+  
+  for (n=0; n<*count; n++){
+    memcpy(tmp,pos,*size);
+    for (i=0; i<*size; i++){
+      fputc(tmp[i], fp[*unit]);
+    }
+    pos += *size;
+  }
+  
+  free(tmp);
+  *ierr = 0;
+  return;
+}
+
+
+/* Write to a file */
+void BINARY_FILE_WRITE_FLOAT(int* unit, const float* buffer, int* count, int* size,  int* ierr){
+  
+  int i,n;
+  unsigned char* tmp;
+  char* pos;
+  
+  tmp = malloc(*size);
+  pos = (char*) buffer;
+  
+  for (n=0; n<*count; n++){
+    memcpy(tmp,pos,*size);
+    for (i=0; i<*size; i++){
+      fputc(tmp[i], fp[*unit]);
+    }
+    pos += *size;
+  }
+  
+  free(tmp);
+  *ierr = 0;
+  return;
+}
+
 
 /* Read from a file */
 void BINARY_FILE_READ(int* unit, void* buffer, int* count, int* size,  int* ierr){
