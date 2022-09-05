@@ -1,0 +1,13 @@
+#!/bin/bash
+#PBS -l nodes=35:ppn=12
+#PBS -l walltime=48:00:00
+#PBS -q long
+#PBS -N AMR
+#PBS -j oe
+#PBS -S /bin/bash
+#PBS -m ea
+#PBS -M mn556@marvin.cac.cornell.edu
+
+set -x
+cd "$PBS_O_WORKDIR"
+/opt/openmpi/gnu/1.6.3-gcc-8.2.0/bin/mpiexec -np 420 ./main3d.gnu.MPI.ex inputs 1>output24.log 2>error

@@ -1,0 +1,343 @@
+module grid_module
+
+implicit none
+
+contains
+
+  subroutine compute_grid(lev)
+    !use amrex_base_module
+    use amr_data_module
+    use my_amr_module
+    implicit none
+
+    integer, intent(in) :: lev
+    type(amrex_mfiter) :: mfi
+    type(amrex_box) :: bx
+    real(amrex_real), contiguous, pointer, dimension(:) :: x,y,z,xm,ym,zm
+    integer :: tilecount, totaltilecount
+  
+    totaltilecount=0
+    call amrex_mfiter_build(mfi, phi_new(lev), tiling=.true.)
+    do while(mfi%next())
+        totaltilecount=totaltilecount+1
+    end do
+    call amrex_mfiter_destroy(mfi)
+
+    allocate(tile(totaltilecount))
+
+    call amrex_mfiter_build(mfi, phi_new(lev), tiling=.true.)
+    tilecount=0
+    do while(mfi%next())
+      bx = mfi%tilebox()
+      tilecount=tilecount+1
+      allocate(tile(tilecount)%x (bx%lo(1)-1:bx%hi(1)+2))
+      allocate(tile(tilecount)%y (bx%lo(2)-1:bx%hi(2)+2))
+      allocate(tile(tilecount)%z (bx%lo(3)-1:bx%hi(3)+2))
+      allocate(tile(tilecount)%xm(bx%lo(1)-1:bx%hi(1)+1))
+      allocate(tile(tilecount)%ym(bx%lo(2)-1:bx%hi(2)+1))
+      allocate(tile(tilecount)%zm(bx%lo(3)-1:bx%hi(3)+1))
+    end do
+    call amrex_mfiter_destroy(mfi)
+
+    call amrex_mfiter_build(mfi, phi_new(lev), tiling=.true.)
+    tilecount=0
+    do while(mfi%next())
+      bx = mfi%tilebox()
+      tilecount=tilecount+1
+      !x => tile(tilecount)%x
+      call grid(amrex_problo,amrex_geom(lev)%dx,tile(tilecount)%x,tile(tilecount)%y,tile(tilecount)%z,&
+						tile(tilecount)%xm,tile(tilecount)%ym,tile(tilecount)%zm,&
+						bx%lo,bx%hi)
+    end do
+    call amrex_mfiter_destroy(mfi)
+
+end subroutine compute_grid
+
+subroutine grid(prob_lo,dx,x,y,z,xm,ym,zm,lo,hi)	
+
+  use amrex_base_module
+  use irl_fortran_interface
+
+  implicit none
+
+  double precision, intent(in) :: dx(3), prob_lo(3)
+  integer, intent(in) :: lo(3), hi(3)
+  real(amrex_real), intent(out) :: x(lo(1)-1:hi(1)+2)
+  real(amrex_real), intent(out) :: y(lo(2)-1:hi(2)+2)
+  real(amrex_real), intent(out) :: z(lo(3)-1:hi(3)+2)
+  real(amrex_real), intent(out) :: xm(lo(1)-1:hi(1)+1)
+  real(amrex_real), intent(out) :: ym(lo(2)-1:hi(2)+1)
+  real(amrex_real), intent(out) :: zm(lo(3)-1:hi(3)+1)
+  integer :: i, j, k
+
+
+    ! node grid
+    do i=lo(1)-1,hi(1)+2
+       x(i) = dble(i)*dx(1) + prob_lo(1)
+    end do
+
+    do j=lo(2)-1,hi(2)+2
+       y(j) = dble(j)*dx(2) + prob_lo(2)
+    end do
+
+    do k =lo(3)-1,hi(3)+2
+       z(k) = dble(k)*dx(3) + prob_lo(3)
+    end do
+
+   ! cell grid
+   do i=lo(1)-1,hi(1)+1
+      xm(i)=(x(i)+x(i+1))/2.0d0
+   end do
+   do j=lo(2)-1,hi(2)+1
+      ym(j)=(y(j)+y(j+1))/2.0d0
+   end do
+   do k=lo(3)-1,hi(3)+1
+      zm(k)=(z(k)+z(k+1))/2.0d0
+   end do
+
+end subroutine grid
+subroutine initialize_IRL_arrays(lo,hi,planar_localizer_allocation,planar_separator_allocation,localized_separator_link_allocation,localizer_link_allocation,&
+                                   plocalizer,pseparator,plocseplink,ploclink,clo,chi,x,y,z)
+  use amrex_base_module
+  use irl_fortran_interface
+  implicit none
+
+  integer, intent(in) :: lo(3),hi(3),clo(3),chi(3)
+  type(ObjServer_PlanarLoc_type) :: planar_localizer_allocation
+  type(ObjServer_PlanarSep_type) :: planar_separator_allocation
+  type(ObjServer_LocSepLink_type) :: localized_separator_link_allocation
+  type(ObjServer_LocLink_type) :: localizer_link_allocation
+  type(PlanarLoc_type),  intent(inout) :: plocalizer(clo(1):chi(1),clo(2):chi(2),clo(3):chi(3))
+  type(PlanarSep_type),  intent(inout) :: pseparator(clo(1):chi(1),clo(2):chi(2),clo(3):chi(3))
+  type(LocSepLink_type), intent(inout) :: plocseplink(clo(1):chi(1),clo(2):chi(2),clo(3):chi(3))
+  type(LocLink_type),    intent(inout) :: ploclink(clo(1):chi(1),clo(2):chi(2),clo(3):chi(3))
+  type(PlanarLoc_type)  :: dummylocalizer(clo(1):chi(1),clo(2):chi(2),clo(3):chi(3))
+  type(PlanarSep_type)  :: dummyseparator(clo(1):chi(1),clo(2):chi(2),clo(3):chi(3))
+  type(LocSepLink_type) :: dummylocseplink(clo(1):chi(1),clo(2):chi(2),clo(3):chi(3))
+  type(LocLink_type)    :: dummyloclink(clo(1):chi(1),clo(2):chi(2),clo(3):chi(3))
+
+  real(amrex_real), intent(in) :: x(lo(1)-1:hi(1)+2)
+  real(amrex_real), intent(in) :: y(lo(2)-1:hi(2)+2)
+  real(amrex_real), intent(in) :: z(lo(3)-1:hi(3)+2)
+
+  real(amrex_real) :: dx, dy, dz
+  integer :: i,j,k
+  plocalizer =dummylocalizer
+  pseparator =dummyseparator
+  plocseplink=dummylocseplink
+  ploclink   =dummyloclink
+
+  dx=x(lo(1))-x(lo(1)-1)
+  dy=y(lo(2))-y(lo(2)-1)
+  dz=z(lo(3))-z(lo(3)-1)
+  !call Constants_setVOFBounds(VOFlo)
+  call setMinimumVolToTrack(dx*dy*dz*1.0d-15)
+
+  ! Initialize arrays and setup linking
+  do k=lo(3)-1,hi(3)+1
+     do j=lo(2)-1,hi(2)+1
+        do i=lo(1)-1,hi(1)+1
+           call new(plocalizer(i,j,k),planar_localizer_allocation)
+           call setFromRectangularCuboid(plocalizer(i,j,k),(/x(i),y(j),z(k)/),(/x(i+1),y(j+1),z(k+1)/))
+           call new(pseparator(i,j,k),planar_separator_allocation)
+           call new(plocseplink(i,j,k),localized_separator_link_allocation,plocalizer(i,j,k),pseparator(i,j,k))
+           call new(ploclink(i,j,k),localizer_link_allocation,plocalizer(i,j,k))
+        end do
+     end do
+  end do
+
+end subroutine initialize_IRL_arrays
+
+subroutine vof_normal(lo,hi,VOF,clo,chi,pseparator,normlo,normhi,pnorm,Gvol,Lvol,vollo,volhi,dx,prob_lo)
+  use amrex_base_module
+  use amr_data_module
+  use precision
+  use irl_fortran_interface
+  implicit none
+  integer  :: i,j,k
+  double precision :: normval, normx, normy, normz
+  integer, intent(in) :: lo(3), hi(3), clo(3), chi(3), normlo(3), normhi(3), vollo(3), volhi(3)
+  double precision, intent(in) :: dx(3),prob_lo(3)
+  double precision, dimension(clo(1):chi(1),clo(2):chi(2),clo(3):chi(3)), intent(in) :: VOF
+  double precision, dimension(vollo(1):volhi(1),vollo(2):volhi(2),vollo(3):volhi(3),6), intent(out) :: Gvol, Lvol
+  type(PlanarSep_type), dimension(clo(1):chi(1),clo(2):chi(2),clo(3):chi(3)), intent(inout) :: pseparator
+  double precision, dimension(clo(1):chi(1),clo(2):chi(2),clo(3):chi(3)) :: tmp
+  double precision, dimension(normlo(1):normhi(1),normlo(2):normhi(2),normlo(3):normhi(3),3), intent(out):: pnorm
+  real(amrex_real) :: x(lo(1)-3:hi(1)+3)
+  real(amrex_real) :: y(lo(2)-3:hi(2)+3)
+  real(amrex_real) :: z(lo(3)-3:hi(3)+3)
+  type(RectCub_type) :: cell
+  type(SepVM_type) :: GandLVols
+  double precision :: xm, ym, zm, cell_vol
+  integer :: ind,ii,jj,kk
+  type(ELVIRANeigh_type) :: neighborhood
+  type(RectCub_type), dimension(0:26) :: neighborhood_cells
+  real(IRL_double), dimension(0:26) :: liquid_volume_fraction
+  !integer(IRL_SignedIndex_t) :: i,j,k
+
+    do i=lo(1)-3,hi(1)+3
+       x(i) = dble(i)*dx(1) + prob_lo(1)
+    end do
+    do j=lo(2)-3,hi(2)+3
+       y(j) = dble(j)*dx(2) + prob_lo(2)
+    end do
+    do k =lo(3)-3,hi(3)+3
+       z(k) = dble(k)*dx(3) + prob_lo(3)
+    end do
+
+  ! Give ourselves a ELVIRA neighborhood of 27 cells
+  call new(neighborhood)
+  do i=0,26
+     call new(neighborhood_cells(i))
+  end do
+  call setSize(neighborhood,27)
+  ind = 0
+  do k=-1,+1
+     do j=-1,+1
+        do i=-1,+1
+	   call setMember(neighborhood,neighborhood_cells(ind),liquid_volume_fraction(ind),i,j,k)
+           ind = ind + 1
+        end do
+     end do
+  end do
+
+  call new(cell)
+  call new(GandLVols)
+
+  do k=lo(3)-1,hi(3)+1
+     do j=lo(2)-1,hi(2)+1
+        do i=lo(1)-1,hi(1)+1
+
+	   ! Handle full cells
+           if (VOF(i,j,k).lt.VOFlo.or.VOF(i,j,k).gt.VOFhi) then
+	   call setNumberOfPlanes(pseparator(i,j,k),1)
+           call setPlane(pseparator(i,j,k),0,(/0.0d0,0.0d0,0.0d0/),0.0d0)
+           call construct_2pt(cell,(/x(i),y(j),z(k)/),(/x(i+1),y(j+1),z(k+1)/) )
+           call matchVolumeFraction(cell,VOF(i,j,k),pseparator(i,j,k))
+	   cycle
+	   endif
+	  ! Set neighborhood_cells and liquid_volume_fraction to current correct values
+           ind = 0
+           do kk=k-1,k+1
+              do jj=j-1,j+1
+                 do ii=i-1,i+1
+                    call construct_2pt(neighborhood_cells(ind),(/x(ii),y(jj),z(kk)/),(/x(ii+1),y(jj+1),z(kk+1)/))
+                    liquid_volume_fraction(ind) = VOF(ii,jj,kk)
+                    ind = ind+1
+                 end do
+              end do
+           end do
+           ! Perform the reconstruction
+           call reconstructELVIRA3D(neighborhood,pseparator(i,j,k))
+	 end do
+      end do
+    end do
+
+    do k=lo(3)-1,hi(3)+1
+       do j=lo(2)-1,hi(2)+1
+          do i=lo(1)-1,hi(1)+1
+
+	   xm=(x(i)+x(i+1))/2.0d0
+           ym=(y(j)+y(j+1))/2.0d0
+           zm=(z(k)+z(k+1))/2.0d0
+
+           cell_vol=dx(1)*dx(2)*dx(3)
+           if(VOF(i,j,k).gt.VOFhi)then
+              Lvol(i,j,k,:)=0.5_WP*cell_vol
+              Gvol(i,j,k,:)=0.0_WP
+           else if(VOF(i,j,k).lt.VOFlo)then
+              Lvol(i,j,k,:)=0.0_WP
+              Gvol(i,j,k,:)=0.5_WP*cell_vol
+           else if(VOF(i,j,k).gt.VOFlo.and.VOF(i,j,k).lt.VOFhi)then
+	   call construct_2pt(cell,(/x(i),y(j),z(k)/),(/xm,y(j+1),z(k+1)/) )
+           call getNormMoments(cell,pseparator(i,j,k),GandLVols)
+           Lvol(i,j,k,1)=getVolumePtr(GandLVols,0)
+           Gvol(i,j,k,1)=getVolumePtr(GandLVols,1)
+
+           call construct_2pt(cell,(/xm,y(j),z(k)/),(/x(i+1),y(j+1),z(k+1)/) )
+           call getNormMoments(cell,pseparator(i,j,k),GandLVols)
+           Lvol(i,j,k,2)=getVolumePtr(GandLVols,0)
+           Gvol(i,j,k,2)=getVolumePtr(GandLVols,1)
+
+           call construct_2pt(cell,(/x(i),y(j),z(k)/),(/x(i+1),ym,z(k+1)/) )
+           call getNormMoments(cell,pseparator(i,j,k),GandLVols)
+           Lvol(i,j,k,3)=getVolumePtr(GandLVols,0)
+           Gvol(i,j,k,3)=getVolumePtr(GandLVols,1)
+
+           call construct_2pt(cell,(/x(i),ym,z(k)/),(/x(i+1),y(j+1),z(k+1)/) )
+           call getNormMoments(cell,pseparator(i,j,k),GandLVols)
+           Lvol(i,j,k,4)=getVolumePtr(GandLVols,0)
+           Gvol(i,j,k,4)=getVolumePtr(GandLVols,1)
+
+           call construct_2pt(cell,(/x(i),y(j),z(k)/),(/x(i+1),y(j+1),zm/) )
+           call getNormMoments(cell,pseparator(i,j,k),GandLVols)
+           Lvol(i,j,k,5)=getVolumePtr(GandLVols,0)
+           Gvol(i,j,k,5)=getVolumePtr(GandLVols,1)
+
+           call construct_2pt(cell,(/x(i),y(j),zm/),(/x(i+1),y(j+1),z(k+1)/) )
+           call getNormMoments(cell,pseparator(i,j,k),GandLVols)
+           Lvol(i,j,k,6)=getVolumePtr(GandLVols,0)
+           Gvol(i,j,k,6)=getVolumePtr(GandLVols,1)
+	   endif
+
+       end do
+     end do
+  end do
+
+contains
+
+! =========================================== !
+  ! Smoothing of VOF to improve Young's normals !
+  ! =========================================== !
+  subroutine smoother(lo,hi,tmp,VOF,clo,chi)
+    use precision
+    implicit none
+    integer :: i,j,k,ii,jj,kk,count
+    integer, intent(in) :: lo(3), hi(3), clo(3), chi(3)
+    double precision, dimension(clo(1):chi(1),clo(2):chi(2),clo(3):chi(3)), intent(in) :: VOF
+    double precision, dimension(clo(1):chi(1),clo(2):chi(2),clo(3):chi(3)), intent(out) :: tmp
+
+    ! Perform local average
+    tmp=0.0d0
+    do k=lo(3)-2,hi(3)+2
+       do j=lo(2)-2,hi(2)+2
+          do i=lo(1)-2,hi(1)+2
+          ! Smooth local value
+             count=0
+            do kk=k-1,k+1
+               do jj=j-1,j+1
+                  do ii=i-1,i+1
+                     ! Average
+                      tmp(i,j,k)=tmp(i,j,k)+VOF(ii,jj,kk)
+                      count=count+1
+                   end do
+                end do
+            end do
+            tmp(i,j,k)=tmp(i,j,k)/real(count,WP)
+           end do
+        end do
+     end do
+
+    return
+  end subroutine smoother
+
+end subroutine vof_normal
+
+subroutine checkplane(lo,hi,pseparator,clo,chi)
+  use irl_fortran_interface
+  implicit none
+  integer, intent(in) :: lo(3),hi(3),clo(3),chi(3)
+  type(PlanarSep_type), intent(in)        :: pseparator(clo(1):chi(1),clo(2):chi(2),clo(3):chi(3))
+  integer :: i,j,k
+ do k=lo(3)-1,hi(3)+1
+     do j=lo(2)-1,hi(2)+1
+        do i=lo(1)-1,hi(1)+1
+	   print*, getPlane(pseparator(i,j,k),0)
+	end do
+     end do
+ end do
+
+
+end subroutine checkplane
+
+end module grid_module

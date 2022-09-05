@@ -1,0 +1,442 @@
+! ========================================== !
+! PLIC routines for interface reconstruction !
+! ========================================== !
+module plic_module
+  use amrex_base_module
+  use my_amr_module
+  use compgeom_lookup
+  use amr_data_module
+  use precision 
+  use dump_ensight_str
+  use amrex_fi_mpi
+  implicit none
+  
+contains
+
+subroutine compute_VOF2Mesh(step)
+    use fillpatch_module, only : fillpatch!, fillpatchthree
+    implicit none
+    integer :: ilev
+    integer :: clo(4),chi(4),borlo(4),borhi(4),normlo(4),normhi(4)
+    integer :: ngrow=3
+    type(amrex_box) :: bx
+    type(amrex_mfiter) :: mfi
+    type(amrex_multifab) :: phiborder, null(0:amrex_max_level)
+    real(amrex_real), contiguous, dimension(:,:,:,:), pointer :: phi, phiborderptr,pnorm
+    real :: real1
+    integer :: step
+
+    call dump_ensight_str_plic_headers(amrex_problo,amrex_probhi,step)
+
+    ! Initialize arrays
+    nAllocated    =500
+    nListAllocated=500
+
+    allocate(xNode   (nAllocated))
+    allocate(yNode   (nAllocated))
+    allocate(zNode   (nAllocated))
+    allocate(nodeList(nListAllocated))
+    nNodes=0
+    nZones=0
+
+    do ilev = amrex_get_finest_level(), amrex_get_finest_level()
+
+      ! Create and fill solution vector multifab
+      call amrex_multifab_build(phiborder, phi_new(ilev)%ba, phi_new(ilev)%dm, ncomp, ngrow)
+      call fillpatch(ilev,t_new(0),phiborder,phi_new,phi_old)
+
+      call amrex_mfiter_build(mfi, phi_new(ilev), tiling=.true.)
+
+       do while (mfi%next())
+          bx = mfi%tilebox()
+	  phi => phi_new(ilev)%dataptr(mfi)
+          phiborderptr => phiborder%dataptr(mfi)
+	  pnorm => norm(ilev)%dataptr(mfi)
+	  clo = lbound(phi)
+	  chi = ubound(phi)
+          borlo = lbound(phiborderptr)
+          borhi = ubound(phiborderptr)
+	  normlo = lbound(pnorm)
+	  normhi = ubound(pnorm)
+	  
+          call VOF2Mesh(bx%lo,bx%hi,clo, chi, borlo, borhi, phiborderptr(:,:,:,ncomp), normlo, normhi, pnorm, amrex_problo, amrex_geom(ilev)%dx)
+
+       end do
+
+       call amrex_mfiter_destroy(mfi)
+       call amrex_multifab_destroy(phiborder)
+    end do
+
+    call dump_ensight_str_plic(amrex_problo,amrex_probhi,step)
+   
+  end subroutine compute_VOF2Mesh
+! ====================================== !
+! Creates unstructured mesh on interface !
+! ====================================== !
+
+  subroutine VOF2Mesh(lo, hi, clo, chi, borlo, borhi, VOF, normlo, normhi, pnorm, prob_lo, dx)
+  use grid_module
+  use irl_fortran_interface 
+  implicit none
+
+  !!!!!!!!!!!!!!!!!!!!!
+  integer, intent(in) :: lo(3), hi(3), clo(4), chi(4), borlo(4), borhi(4), normlo(4), normhi(4)
+  double precision, intent(in), dimension (borlo(1):borhi(1),borlo(2):borhi(2),borlo(3):borhi(3)) :: VOF!, xnorm, ynorm, znorm
+  double precision, intent(in), dimension (normlo(1):normhi(1),normlo(2):normhi(2),normlo(3):normhi(3),3) :: pnorm
+  double precision, dimension (lo(1)-1:hi(1)+1,lo(2)-1:hi(2)+1,lo(3)-1:hi(3)+1) ::  xnorm, ynorm, znorm, dist
+  double precision :: x(lo(1)-1:hi(1)+2), y(lo(2)-1:hi(2)+2), z(lo(3)-1:hi(3)+2) 
+  double precision :: prob_lo(3), dx(3)
+  !!!!!!!!!!!!!!!!!!!!!
+
+  integer :: i,j,k,ii,jj,kk
+  integer :: ntet,n,nn,nnn,dim,ntri
+  integer :: case,case2,v1,v2
+  double precision, dimension(3,8) :: verts
+  double precision, dimension(3,5) :: tverts,tverts2
+  double precision, dimension(3,4) :: mytet
+  double precision, dimension(4) :: d
+  double precision, dimension(3) :: node
+  double precision :: mu
+  integer :: ilev
+  type(PlanarSep_type) :: pseparator(borlo(1):borhi(1),borlo(2):borhi(2),borlo(3):borhi(3))
+  double precision, dimension(borlo(1):borhi(1),borlo(2):borhi(2),borlo(3):borhi(3)) :: tmp
+  real(8), dimension(4) :: plane
+  double precision :: normval
+  type(RectCub_type) :: cell
+  integer(IRL_LargeOffsetIndex_t) :: heapsize
+  type(ObjServer_PlanarSep_type) :: planar_separator_allocation
+
+  call new(cell)
+ ! Initialize size for IRL
+   heapsize = int((hi(3)-lo(3)+3),8)*int((hi(2)-lo(2)+3),8)*int((hi(1)-lo(1)+3),8)
+   call new(planar_separator_allocation,heapsize)
+
+
+  ! Initialize arrays and setup linking
+  do k=lo(3)-1,hi(3)+1
+     do j=lo(2)-1,hi(2)+1
+        do i=lo(1)-1,hi(1)+1
+           call new(pseparator(i,j,k),planar_separator_allocation)
+        end do
+     end do
+  end do
+
+    do i=lo(1)-1,hi(1)+2
+       x(i) = dble(i)*dx(1) + prob_lo(1)
+    end do
+    do j=lo(2)-1,hi(2)+2
+       y(j) = dble(j)*dx(2) + prob_lo(2)
+    end do
+    do k =lo(3)-1,hi(3)+2
+       z(k) = dble(k)*dx(3) + prob_lo(3)
+    end do
+
+   xnorm=0.0d0;ynorm=0.0d0;znorm=0.0d0;dist=0.0d0
+
+  ! First smooth VOF field
+  call smoother(lo,hi,tmp,VOF,borlo,borhi)
+ 
+  ! Normal update using Young's method
+  do k=lo(3)-1,hi(3)+1
+     do j=lo(2)-1,hi(2)+1
+        do i=lo(1)-1,hi(1)+1
+           ! VOF gradient
+           xnorm(i,j,k)=(tmp(i+1,j,k)-tmp(i-1,j,k))/(2.0d0*dx(1))
+           ynorm(i,j,k)=(tmp(i,j+1,k)-tmp(i,j-1,k))/(2.0d0*dx(2))
+           znorm(i,j,k)=(tmp(i,j,k+1)-tmp(i,j,k-1))/(2.0d0*dx(3))
+           ! Normalize it
+           normval=sqrt(xnorm(i,j,k)**2+ynorm(i,j,k)**2+znorm(i,j,k)**2)
+           if (normval.gt.0.0d0) then
+              xnorm(i,j,k)=-xnorm(i,j,k)/normval
+              ynorm(i,j,k)=-ynorm(i,j,k)/normval
+              znorm(i,j,k)=-znorm(i,j,k)/normval
+           else
+              xnorm(i,j,k)=0.0d0
+              ynorm(i,j,k)=0.0d0
+              znorm(i,j,k)=0.0d0
+           end if
+	   call setNumberOfPlanes(pseparator(i,j,k),1)
+           call setPlane(pseparator(i,j,k),0,(/xnorm(i,j,k),ynorm(i,j,k),znorm(i,j,k)/),0.0d0)
+           call construct_2pt(cell,(/x(i),y(j),z(k)/),(/x(i+1),y(j+1),z(k+1)/) )
+           call matchVolumeFraction(cell,VOF(i,j,k),pseparator(i,j,k))
+           plane=getPlane(pseparator(i,j,k),0)
+           dist(i,j,k)=plane(4)
+       end do
+     end do
+  end do
+
+
+  ! Traverse interior cells only
+
+  do k=lo(3),hi(3)
+     do j=lo(2),hi(2)
+        do i=lo(1),hi(1)
+
+	   !!!!!!!!!!!!!!!!!!!!!!!!!
+           ! Cells with interface
+           if (VOF(i,j,k).ge.VOFlo.and.VOF(i,j,k).le.VOFhi) then
+              
+              ! Cell vertices
+              verts(:,1)=[x(i  ),y(j  ),z(k  )]
+              verts(:,2)=[x(i+1),y(j  ),z(k  )]
+              verts(:,3)=[x(i  ),y(j+1),z(k  )]
+              verts(:,4)=[x(i+1),y(j+1),z(k  )]
+              verts(:,5)=[x(i  ),y(j  ),z(k+1)]
+              verts(:,6)=[x(i+1),y(j  ),z(k+1)]
+              verts(:,7)=[x(i  ),y(j+1),z(k+1)]
+              verts(:,8)=[x(i+1),y(j+1),z(k+1)]
+ 
+              ! Loop over tets
+              do ntet=1,5
+                 ! Create tet and distance
+                 do n=1,4
+                    mytet(:,n)=verts(:,verts2tets(n,ntet))
+                    d(n)=xnorm(i,j,k)*mytet(1,n)+ynorm(i,j,k)*mytet(2,n)+znorm(i,j,k)*mytet(3,n)-dist(i,j,k)
+                 end do
+                 ! Find cut case
+                 case=1+int(0.5d0+sign(0.5d0,d(1)))+&
+                      2*int(0.5d0+sign(0.5d0,d(2)))+&
+                      4*int(0.5d0+sign(0.5d0,d(3)))+&
+                      8*int(0.5d0+sign(0.5d0,d(4)))
+                 ! Add points on cut plane to nodes
+                 do n=1,cut_nvert(case)
+                    v1=cut_v1(n,case); v2=cut_v2(n,case)
+                    mu=min(1.0d0,max(0.0d0,-d(v1)/(sign(abs(d(v2)-d(v1))+epsilon(1.0d0),d(v2)-d(v1)))))
+                    node=(1.0d0-mu)*mytet(:,v1)+mu*mytet(:,v2)
+                    nNodes=nNodes+1
+                    xNode(nNodes)=real(node(1),SP)
+                    yNode(nNodes)=real(node(2),SP)
+                    zNode(nNodes)=real(node(3),SP)
+                 end do
+                 ! Create node list to tris on interface
+                 do n=1,cut_ntris(case)
+                    do nn=1,3
+                       nodeList(3*nZones+nn)=nNodes-cut_nvert(case)+(cut_vtri(nn,n,case)-4)
+                    end do
+                    nZones=nZones+1
+                 end do
+              end do
+           end if
+          
+           ! Inherent inferface between cells
+           do dim=1,3
+              ! Neighboring cell indices
+              select case(dim)
+              case (1); ii=i-1; jj=j  ; kk=k
+              case (2); ii=i  ; jj=j-1; kk=k
+              case (3); ii=i  ; jj=j  ; kk=k-1
+              end select
+              ! Check for inherent interface
+              if ( (VOF(i ,j ,k ).ge.VOFlo.and.VOF(i ,j ,k ).le.VOFhi) .or. & ! - VOF(i ,j ,k ) has interface
+                   (VOF(ii,jj,kk).ge.VOFlo.and.VOF(ii,jj,kk).le.VOFhi) .or. & ! - VOF(ii,jj,kk) has interface
+                   (VOF(i ,j ,k ).lt.VOFlo.and.VOF(ii,jj,kk).gt.VOFhi) .or. & ! - Interface between VOF(i,j,k)
+                   (VOF(ii,jj,kk).lt.VOFlo.and.VOF(i ,j ,k ).gt.VOFhi) ) then !    & VOF(ii,jj,kk)
+                 ! Cell face vertices
+                 select case(dim)
+                 case (1)
+                    verts(:,1)=[x(i  ),y(j  ),z(k  )]
+                    verts(:,2)=[x(i  ),y(j+1),z(k  )]
+                    verts(:,3)=[x(i  ),y(j  ),z(k+1)]
+                    verts(:,4)=[x(i  ),y(j+1),z(k+1)]
+                 case (2)
+                    verts(:,1)=[x(i  ),y(j  ),z(k  )]
+                    verts(:,2)=[x(i+1),y(j  ),z(k  )]
+                    verts(:,3)=[x(i  ),y(j  ),z(k+1)]
+                    verts(:,4)=[x(i+1),y(j  ),z(k+1)]
+                 case (3)
+                    verts(:,1)=[x(i  ),y(j  ),z(k  )]
+                    verts(:,2)=[x(i+1),y(j  ),z(k  )]
+                    verts(:,3)=[x(i  ),y(j+1),z(k  )]
+                    verts(:,4)=[x(i+1),y(j+1),z(k  )]
+                 end select
+                 ! Loop over tris
+                 do ntri=1,2
+                    ! Create tri
+                    do n=1,3
+                       tverts(:,n)=verts(:,verts2tris(n,ntri))
+                    end do
+                    ! Calculate distance to interface
+                    if (VOF(i,j,k).lt.VOFlo) then
+                       d(:)=+1.0d0
+                    else if (VOF(i,j,k).gt.VOFhi) then
+                       d(:)=-1.0d0
+                    else 
+                       d(1:3) = xnorm(i,j,k)*tverts(1,1:3) &
+                              + ynorm(i,j,k)*tverts(2,1:3) &
+                              + znorm(i,j,k)*tverts(3,1:3) &
+                              - dist (i,j,k)
+                    end if
+                    ! Find cut case
+                    case=1+int(0.5d0+sign(0.5d0,d(1)))+&
+                         2*int(0.5d0+sign(0.5d0,d(2)))+&
+                         4*int(0.5d0+sign(0.5d0,d(3)))
+                    ! Add points on cut plane to nodes 
+                    do n=1,cutTri_nvert(case)
+                       v1=cutTri_v1(n,case); v2=cutTri_v2(n,case)
+                       mu=min(1.0d0,max(0.0d0,-d(v1)/(sign(abs(d(v2)-d(v1))+epsilon(1.0d0),d(v2)-d(v1)))))
+                       tverts(:,3+n)=(1.0d0-mu)*tverts(:,v1)+mu*tverts(:,v2)
+                    end do
+                    ! Cut tris on liquid side by neighboring cell interface
+                    do n=cutTri_np(case)+1,cutTri_np(case)+cutTri_nn(case)
+                       ! Create liquid tris
+                       do nn=1,3
+                          tverts2(:,nn)=tverts(:,cutTri_v(nn,n,case))
+                       end do
+                       ! Compute distances
+                       if (VOF(ii,jj,kk).lt.VOFlo) then
+                          d(:)=+1.0d0
+                       else if (VOF(ii,jj,kk).gt.VOFhi) then
+                          d(:)=-1.0d0
+                       else
+                          d(1:3) = xnorm(ii,jj,kk)*tverts2(1,1:3) &
+                                 + ynorm(ii,jj,kk)*tverts2(2,1:3) &
+                                 + znorm(ii,jj,kk)*tverts2(3,1:3) &
+                                 - dist (ii,jj,kk)
+                       end if
+                       ! Find cut case
+                       case2=1+int(0.5d0+sign(0.5d0,d(1)))+&
+                             2*int(0.5d0+sign(0.5d0,d(2)))+&
+                             4*int(0.5d0+sign(0.5d0,d(3)))
+                       ! Add points on cut plane to nodes 
+                       do nn=1,cutTri_nvert(case2)
+                          v1=cutTri_v1(nn,case2); v2=cutTri_v2(nn,case2)
+                          mu=min(1.0d0,max(0.0d0,-d(v1)/(sign(abs(d(v2)-d(v1))+epsilon(1.0d0),d(v2)-d(v1)))))
+                          tverts2(:,3+nn)=(1.0d0-mu)*tverts2(:,v1)+mu*tverts2(:,v2)
+                       end do
+                       ! Tris on liquid side of (i,j,k) and gas side of (ii,jj,kk) cut planes
+                       do nn=1,cutTri_np(case2)
+                          ! Create tris and save in Visit output
+                          do nnn=1,3
+                             nNodes=nNodes+1
+                             xNode(nNodes)=real(tverts2(1,cutTri_v(nnn,nn,case2)),SP)
+                             yNode(nNodes)=real(tverts2(2,cutTri_v(nnn,nn,case2)),SP)
+                             zNode(nNodes)=real(tverts2(3,cutTri_v(nnn,nn,case2)),SP)
+                             nodeList(3*nZones+nnn)=nNodes
+                          end do
+                          nZones=nZones+1
+                       end do
+                    end do
+                    ! Cut tris on gas side by neighboring cell interface
+                    do n=1,cutTri_np(case)
+                       ! Transfer verts
+                       do nn=1,3
+                          tverts2(:,nn)=tverts(:,cutTri_v(nn,n,case))
+                       end do
+                       ! Compute distances
+                       if (VOF(ii,jj,kk).lt.VOFlo) then
+                          d(:)=+1.0d0
+                       else if (VOF(ii,jj,kk).gt.VOFhi) then
+                          d(:)=-1.0d0
+                       else
+                          d(1:3) = xnorm(ii,jj,kk)*tverts2(1,1:3) &
+                                 + ynorm(ii,jj,kk)*tverts2(2,1:3) &
+                                 + znorm(ii,jj,kk)*tverts2(3,1:3) &
+                                 - dist (ii,jj,kk)
+                       end if
+                       ! Find cut case
+                       case2=1+int(0.5d0+sign(0.5d0,d(1)))+&
+                             2*int(0.5d0+sign(0.5d0,d(2)))+&
+                             4*int(0.5d0+sign(0.5d0,d(3)))
+                       ! Add points on cut plane to nodes 
+                       do nn=1,cutTri_nvert(case2)
+                          v1=cutTri_v1(nn,case2); v2=cutTri_v2(nn,case2)
+                          mu=min(1.0d0,max(0.0d0,-d(v1)/(sign(abs(d(v2)-d(v1))+epsilon(1.0d0),d(v2)-d(v1)))))
+                          tverts2(:,3+nn)=(1.0d0-mu)*tverts2(:,v1)+mu*tverts2(:,v2)
+                       end do
+                       ! Tris on gas side of (i,j,k) and liquid side of (ii,jj,kk) cut planes
+                       do nn=cutTri_np(case2)+1,cutTri_np(case2)+cutTri_nn(case2)
+                          ! Create tris and save in Visit output
+                          do nnn=1,3
+                             nNodes=nNodes+1
+                             xNode(nNodes)=real(tverts2(1,cutTri_v(nnn,nn,case2)),SP)
+                             yNode(nNodes)=real(tverts2(2,cutTri_v(nnn,nn,case2)),SP)
+                             zNode(nNodes)=real(tverts2(3,cutTri_v(nnn,nn,case2)),SP)
+                             nodeList(3*nZones+nnn)=nNodes
+                          end do
+                          nZones=nZones+1
+                       end do
+                    end do
+                 end do
+              end if
+           end do
+          
+           ! Reallocate arrays if necessary
+           if (nAllocated-nNodes.lt.200) then
+              allocate(tmpNode(nAllocated))
+              tmpNode=xNode; deallocate(xNode); allocate(xNode(nAllocated+1000)); xNode(1:nAllocated)=tmpNode
+              tmpNode=yNode; deallocate(yNode); allocate(yNode(nAllocated+1000)); yNode(1:nAllocated)=tmpNode
+              tmpNode=zNode; deallocate(zNode); allocate(zNode(nAllocated+1000)); zNode(1:nAllocated)=tmpNode
+              deallocate(tmpNode)
+              nAllocated=nAllocated+1000
+		
+           end if
+           if (nListAllocated-3*nZones.lt.200) then
+              allocate(tmpNodeList(nListAllocated))
+              tmpNodeList=nodeList; 
+              deallocate(nodeList); 
+              allocate(nodeList(nListAllocated+1000)); 
+              nodeList(1:nListAllocated)=tmpNodeList
+              deallocate(tmpNodeList)
+              nListAllocated=nListAllocated+1000
+           end if
+           
+        end do
+     end do
+  end do
+
+  
+  ! Add a zero-area tri if this proc doesn't have one
+  if (nZones.eq.0) then
+
+     nZones=1
+     nNodes=3
+     !!!!!!!!
+     xNode(1:3)=real((x(clo(1))+x(clo(1)+1))/2.0d0,SP)
+     yNode(1:3)=real((y(clo(2))+y(clo(2)+1))/2.0d0,SP)
+     zNode(1:3)=real((z(clo(3))+z(clo(3)+1))/2.0d0,SP)
+     !!!!!!!!!	
+
+     nodeList(1:3)=(/1,2,3/)
+  end if
+
+    return
+contains
+
+  ! =========================================== !
+  ! Smoothing of VOF to improve Young's normals !
+  ! =========================================== !
+  subroutine smoother(lo,hi,tmp,VOF,clo,chi)
+    use precision
+    implicit none
+    integer :: i,j,k,ii,jj,kk,count
+    integer, intent(in) :: lo(3), hi(3), clo(3), chi(3)
+    double precision, dimension(clo(1):chi(1),clo(2):chi(2),clo(3):chi(3)), intent(in) :: VOF
+    double precision, dimension(clo(1):chi(1),clo(2):chi(2),clo(3):chi(3)), intent(out) :: tmp
+
+    ! Perform local average
+    tmp=0.0d0
+    do k=lo(3)-2,hi(3)+2
+       do j=lo(2)-2,hi(2)+2
+          do i=lo(1)-2,hi(1)+2
+          ! Smooth local value
+             count=0
+            do kk=k-1,k+1
+               do jj=j-1,j+1
+                  do ii=i-1,i+1
+                     ! Average
+                      tmp(i,j,k)=tmp(i,j,k)+VOF(ii,jj,kk)
+                      count=count+1
+                   end do
+                end do
+            end do
+            tmp(i,j,k)=tmp(i,j,k)/real(count,WP)
+           end do
+        end do
+     end do
+
+  end subroutine smoother
+
+
+end subroutine VOF2Mesh
+
+end module  plic_module
