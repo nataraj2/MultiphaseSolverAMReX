@@ -343,9 +343,6 @@ do zcennum=3,3
 		endif
 		endif
 
-		print*, "Max level is ", max_level
-		stop
-
 		if(level.eq.max_level)then
                 if(gamma_mix_n*(P_n+Pref_n)/RHO_n(i,j,k).le.0.0d0)then
 		print*, "Still a problem", rhoE_n(i,j,k), rhoU_n(i,j,k), rhoV_n(i,j,k), rhoW_n(i,j,k), gamma_mix_n, P_n, Pref_n, x, y, z
