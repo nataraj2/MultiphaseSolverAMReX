@@ -122,7 +122,7 @@ contains
     if(time.le.2d-6)then
     dt =2.5d-8!dt_est * cfl
     else
-    dt=1.25d-8
+    dt=5d-8
     endif	
 
 
