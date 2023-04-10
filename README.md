@@ -1,7 +1,11 @@
 # Multiphase flow solver in AMReX
-The code requires the installation of two libraries - AMReX and IRL, both of which are 
-provided in this repository. Hence, this repository is self-contained, and no external packages 
-need to be installed.
+This repository contains the code for an all-Mach multiphase flow solver for liquid-gas 
+flows using a geometric volume-of-fluid method. The code requires the installation of two libraries 
+- AMReX and IRL, both of which are provided in this repository. Hence, this repository is 
+self-contained, and no external packages need to be installed.
+
+# Water jet in supersonic air crossflow 
+<img src="LJSCF_AMReX.gif?raw=true&v=100" alt="your_alternative_text" width="100%" height="100%" loop="true" autoplay="true">
 
 # Installation and compilation 
 ```
