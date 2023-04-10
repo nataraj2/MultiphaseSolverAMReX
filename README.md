@@ -17,7 +17,7 @@ rendered in Blender which show the liquid-gas interface.
 <img src="Images/BubblesInSupersonicCrossflow.gif?raw=true&v=100" alt="your_alternative_text" width="50%" height="50%" loop="true" autoplay="true">
 
 # Scaling
-Scaling studies were performed on the Stampede2 supercomupter at Texas Advanced Supercomputing Center (TACC) Knight Landing (KNL) nodes. Images below 
+Scaling studies were performed on the Stampede2 supercomupter at Texas Advanced Supercomputing Center (TACC) Knights Landing (KNL) nodes. Images below 
 show the strong and weak scaling for single mesh cases, and the effect of adaptation and resource utilization.  
 <img src="Images/StrongScaling.png?raw=true&v=100" alt="your_alternative_text" width="50%" height="50%" loop="true" autoplay="true"><img src="Images/WeakScaling.png?raw=true&v=100" alt="your_alternative_text" width="50%" height="50%" loop="true" autoplay="true">  
 
