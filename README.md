@@ -16,7 +16,7 @@ Simulations are performed for water jet in supersonic air crossflow, spray atomi
 
 # Scaling on Stampede2
 Scaling studies were performed on the Stampede2 supercomupter at Texas Advanced Supercomputing Center (TACC) Knight Landing (KNL) nodes. Images below 
-show the strong and weak scaling for single mesh cases, and the effect of adaptation and resource utilization.
+show the strong and weak scaling for single mesh cases, and the effect of adaptation and resource utilization.  
 <img src="Images/StrongScaling.png?raw=true&v=100" alt="your_alternative_text" width="50%" height="50%" loop="true" autoplay="true"><img src="Images/WeakScaling.png?raw=true&v=100" alt="your_alternative_text" width="50%" height="50%" loop="true" autoplay="true">  
 
 <img src="Images/EffectOfAdaptation.png?raw=true&v=100" alt="your_alternative_text" width="50%" height="50%" loop="true" autoplay="true"><img src="Images/ResourceUtilization.png?raw=true&v=100" alt="your_alternative_text" width="50%" height="50%" loop="true" autoplay="true">
