@@ -5,7 +5,9 @@ AMReX. The code requires the installation of two libraries - AMReX and IRL, both
 Hence, this repository is self-contained, and no external packages need to be installed.
 
 # Simulations
-Simulations are performed for water jet in supersonic air crossflow, spray atomization with acoustic excitation, and collapse of water bubbles in supersonic crossflow. 
+Simulations are performed for water jet in supersonic air crossflow, water spray atomization with acoustic excitation, and collapse of water bubbles in supersonic air crossflow. 
+The simulations below show the adaptively refined mesh and the boxes show the finest level of refienement which captures the interface regions. The simulations are also 
+rendered in Blender which show the liquid-gas interface.
 
 
 <img src="Images/LJSCF_AMReX.gif?raw=true&v=100" alt="your_alternative_text" width="50%" height="50%" loop="true" autoplay="true"><img src="Images/SprayAcoustic.gif?raw=true&v=100" alt="your_alternative_text" width="50%" height="50%" loop="true" autoplay="true">  
