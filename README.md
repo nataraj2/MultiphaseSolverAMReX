@@ -1,4 +1,4 @@
-# Multiphase flow solver in AMReX
+# All-Mach multiphase flow solver in AMReX
 This repository contains the code for an all-Mach multiphase flow solver for liquid-gas 
 flows using a geometric volume-of-fluid method within the block-structured adaptive mesh refinement framework of 
 AMReX. The code requires the installation of two libraries - AMReX and IRL, both of which are provided in this repository. 
