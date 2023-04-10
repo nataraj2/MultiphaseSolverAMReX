@@ -1,13 +1,13 @@
 # Multiphase flow solver in AMReX
 This repository contains the code for an all-Mach multiphase flow solver for liquid-gas 
-flows using a geometric volume-of-fluid method. The code requires the installation of two libraries - AMReX and IRL, 
-both of which are provided in this repository. Hence, this repository is 
-self-contained, and no external packages need to be installed.
+flows using a geometric volume-of-fluid method within the block-structured adaptive mesh refinement framework of 
+AMReX. The code requires the installation of two libraries - AMReX and IRL, both of which are provided in this repository
+. Hence, this repository is self-contained, and no external packages need to be installed.
 
-# Water jet in supersonic air crossflow 
+## Water jet in supersonic air crossflow, spray atomization with acoustic excitation,  
 <img src="Images/LJSCF_AMReX.gif?raw=true&v=100" alt="your_alternative_text" width="50%" height="50%" loop="true" autoplay="true"><img src="Images/SprayAcoustic.gif?raw=true&v=100" alt="your_alternative_text" width="50%" height="50%" loop="true" autoplay="true">  
 
-<img src="Images/LJSCF_AMReX_Blender.gif?raw=true&v=100" alt="your_alternative_text" width="50%" height="50%" loop="true" autoplay="true">
+<img src="Images/LJSCF_AMReX_Blender.gif?raw=true&v=100" alt="your_alternative_text" width="50%" height="50%" loop="true" autoplay="true"><img src="Images/SprayAcousticBlender.gif?raw=true&v=100" alt="your_alternative_text" width="50%" height="50%" loop="true" autoplay="true">
 
 
 # Spray atomization with acoustic excitation
