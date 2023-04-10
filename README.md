@@ -5,7 +5,13 @@ both of which are provided in this repository. Hence, this repository is
 self-contained, and no external packages need to be installed.
 
 # Water jet in supersonic air crossflow 
-<img src="Images/LJSCF_AMReX.gif?raw=true&v=100" alt="your_alternative_text" width="50%" height="50%" loop="true" autoplay="true"><img src="Images/LJSCF_AMReX_Blender.gif?raw=true&v=100" alt="your_alternative_text" width="50%" height="50%" loop="true" autoplay="true">
+<img src="Images/LJSCF_AMReX.gif?raw=true&v=100" alt="your_alternative_text" width="50%" height="50%" loop="true" autoplay="true"><img src="Images/SprayAcoustic.gif?raw=true&v=100" alt="your_alternative_text" width="50%" height="50%" loop="true" autoplay="true">  
+
+<img src="Images/LJSCF_AMReX_Blender.gif?raw=true&v=100" alt="your_alternative_text" width="50%" height="50%" loop="true" autoplay="true">
+
+
+# Spray atomization with acoustic excitation
+ 
 
 # Installation and compilation 
 ```
