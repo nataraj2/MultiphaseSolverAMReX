@@ -5,7 +5,7 @@ flows using a geometric volume-of-fluid method. The code requires the installati
 self-contained, and no external packages need to be installed.
 
 # Water jet in supersonic air crossflow 
-<img src="Images/LJSCF_AMReX.gif?raw=true&v=100" alt="your_alternative_text" width="100%" height="100%" loop="true" autoplay="true">
+<img src="Images/LJSCF_AMReX.gif?raw=true&v=100" alt="your_alternative_text" width="50%" height="50%" loop="true" autoplay="true">
 
 # Installation and compilation 
 ```
